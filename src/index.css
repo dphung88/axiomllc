@@ -16,25 +16,25 @@
   --color-cyan-900: #332600;
 
   /* Overriding Tailwind's default zinc/dark colors with Main Dark (#1B1C36) */
-  --color-zinc-50: #e8e4d8; /* Cream text/bg from real estate */
-  --color-zinc-100: #cfcfda;
-  --color-zinc-200: #aeb0c2;
-  --color-zinc-300: #888aa3;
-  --color-zinc-400: #686984;
-  --color-zinc-500: #515269;
-  --color-zinc-600: #424356;
-  --color-zinc-700: #373847;
-  --color-zinc-800: #1b1c36; /* Main Dark from real estate */
-  --color-zinc-900: #1b1c36;
-  --color-zinc-950: #0c0d1b;
+  --color-zinc-50: #f4f4f7;
+  --color-zinc-100: #e5e5eb;
+  --color-zinc-200: #cfcfda;
+  --color-zinc-300: #aeb0c2;
+  --color-zinc-400: #888aa3;
+  --color-zinc-500: #686984;
+  --color-zinc-600: #515269;
+  --color-zinc-700: #424356;
+  --color-zinc-800: #373847;
+  --color-zinc-900: #1B1C36; /* --color-dark (changed to match UI request) */
+  --color-zinc-950: #1B1C36; /* --color-dark */
 
   /* Overriding default black/white for better contrast with new theme if needed */
-  --color-white: #e8e4d8; /* Cream/Light from real estate */
-  --color-black: #1b1c36; /* Dark from real estate */
+  --color-white: #E8E4D8; /* --color-light as off-white text/bg */
+  --color-black: #0c0d1b;
 
   /* Custom Main Background Colors from Image */
-  --color-main-bg: #1b1c36;
-  --color-secondary-bg: #2d2e4e;
+  --color-main-bg: #1B1C36;
+  --color-secondary-bg: #2D2E4E;
 }
 
 html {

@@ -77,12 +77,23 @@ export function Gallery() {
             Studio <span className="text-cyan-500">Gallery</span>
           </h1>
         </div>
-        <button 
-          onClick={fetchGallery}
-          className="p-4 bg-zinc-900 hover:bg-zinc-800 rounded-xl border border-zinc-800 transition-all text-zinc-400 hover:text-white"
-        >
-          <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex items-center gap-4">
+          <div className="hidden md:block px-4 py-2 bg-zinc-900/50 rounded-lg border border-zinc-800">
+            <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Database Status</span>
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+              <span className="text-[10px] text-zinc-300 font-mono">
+                {import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] || 'Unknown'}
+              </span>
+            </div>
+          </div>
+          <button 
+            onClick={fetchGallery}
+            className="p-4 bg-zinc-900 hover:bg-zinc-800 rounded-xl border border-zinc-800 transition-all text-zinc-400 hover:text-white"
+          >
+            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {loading ? (

@@ -130,7 +130,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         let hasPendingVideos = false;
         if (parsed.scenesState) {
           hasPendingVideos = parsed.scenesState.some((s: SceneState) => 
-            s.variants.some(v => v.loading && !v.url && !v.error)
+            s.loading && !s.url && !s.error
           );
         }
 

@@ -17,6 +17,7 @@ export const saveToStudioGallery = async (data: {
   }
 
   try {
+    console.log(`Attempting to save ${data.type} to Supabase...`, { url: data.url });
     const { error } = await supabase
       .from('studio_gallery')
       .insert([
@@ -28,9 +29,12 @@ export const saveToStudioGallery = async (data: {
           created_at: new Date().toISOString(),
         },
       ]);
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error detail:', error);
+      throw error;
+    }
     console.log(`Successfully saved ${data.type} to Supabase`);
   } catch (error) {
-    console.error('Supabase save error:', error);
+    console.error('CRITICAL: Supabase save failure:', error);
   }
 };

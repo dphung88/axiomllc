@@ -18,13 +18,14 @@ import { AutoStoryProvider, useAutoStory } from './context/AutoStoryContext';
 import { StoryBuilderProvider, useStoryBuilder } from './context/StoryBuilderContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { QuickGenProvider, useQuickGen } from './context/QuickGenContext';
-import { ImageGenProvider } from './context/ImageGenContext';
+import { ImageGenProvider, useImageGen } from './context/ImageGenContext';
 
 function Sidebar() {
   const location = useLocation();
   const { isGenerating, remadeScenes, scenes, showToast } = useRemaker();
   const { isGeneratingVideos, generationProgress } = useAutoStory();
   const { isGenerating: quickIsGenerating } = useQuickGen();
+  const { isGenerating: imageIsGenerating } = useImageGen();
   const storyBuilderState = useStoryBuilder();
   
   const completedScenes = remadeScenes.filter(s => s.url || s.error).length;
@@ -77,6 +78,11 @@ function Sidebar() {
             >
               <Icon className={`w-5 h-5 ${active ? 'text-cyan-500' : 'text-zinc-400'}`} />
               {link.label}
+              {link.path === '/' && imageIsGenerating && (
+                <span className="ml-auto bg-cyan-500 text-black text-[10px] px-2 py-0.5 rounded-full animate-pulse">
+                  ...
+                </span>
+              )}
               {link.path === '/remaker' && isGenerating && totalScenes > 0 && (
                 <span className="ml-auto bg-cyan-500 text-black text-[10px] px-2 py-0.5 rounded-full">
                   {completedScenes}/{totalScenes}

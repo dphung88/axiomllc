@@ -146,16 +146,15 @@ Return the result as a JSON array of exactly ${targetSceneCount} objects with ke
 Respond with valid JSON only. Do not include markdown formatting or extra text.`;
 
   try {
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: 'gemini-1.5-flash',
       contents: [{ role: 'user', parts: [...parts, { text: prompt }] }],
-      generationConfig: {
+      config: {
         responseMimeType: 'application/json',
       }
     });
     
-    const response = await result.response;
-    let jsonResult = response.text();
+    let jsonResult = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text) || '[]';
     
     console.log("Raw Gemini Response:", jsonResult);
 

@@ -114,9 +114,15 @@ export function StyleRemaker() {
       
       addLog('Extracting frames...', 'info');
       const frames = await extractFrames(file, targetSceneCount * 2);
-      addLog(`Extracted ${frames.length} frames. Analyzing with Gemini...`, 'info');
+      addLog(`Extracted ${frames.length} frames. Sending to Gemini AI...`, 'info');
+      
       const extractedScenes = await analyzeVideoScenes(frames, targetSceneCount);
-      addLog(`Successfully analyzed ${extractedScenes.length} scenes.`, 'success');
+      
+      if (!extractedScenes || extractedScenes.length === 0) {
+        throw new Error("AI returned empty scene list. Try again or check your video content.");
+      }
+
+      addLog(`Successfully decomposed into ${extractedScenes.length} scenes.`, 'success');
       setScenes(extractedScenes);
       setStep(3);
     } catch (error: any) {

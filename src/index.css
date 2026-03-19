@@ -3,17 +3,17 @@
 @theme {
   --font-sans: "Aptos", "Segoe UI", system-ui, sans-serif;
 
-  /* Overriding Tailwind's default cyan with LLC Gold/Accent (#B5945B) */
-  --color-cyan-50: #fbf9f5;
-  --color-cyan-100: #f4eee2;
-  --color-cyan-200: #e7dac2;
-  --color-cyan-300: #d6bfa0;
-  --color-cyan-400: #c6a67e;
-  --color-cyan-500: #b5945b; /* --color-accent */
-  --color-cyan-600: #a27e4e;
-  --color-cyan-700: #886542;
-  --color-cyan-800: #6f533a;
-  --color-cyan-900: #594432;
+  /* Overriding Tailwind's default cyan with Real Estate Gold/Accent (#f0c040) */
+  --color-cyan-50: #fff9e6;
+  --color-cyan-100: #fff0cc;
+  --color-cyan-200: #ffe199;
+  --color-cyan-300: #ffd166;
+  --color-cyan-400: #ffc233;
+  --color-cyan-500: #f0c040; /* --color-accent matched from real-estate-marketplace */
+  --color-cyan-600: #cc9900;
+  --color-cyan-700: #997300;
+  --color-cyan-800: #664d00;
+  --color-cyan-900: #332600;
 
   /* Overriding Tailwind's default zinc/dark colors with Main Dark (#1B1C36) */
   --color-zinc-50: #f4f4f7;

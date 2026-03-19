@@ -33,6 +33,23 @@ export function Gallery() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Delete this item from archives?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('studio_gallery')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      setItems(items.filter(item => item.id !== id));
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      alert('Failed to delete item');
+    }
+  };
+
   useEffect(() => {
     fetchGallery();
   }, []);
@@ -96,7 +113,11 @@ export function Gallery() {
                   <a href={item.url} download target="_blank" rel="noreferrer" className="p-3 bg-cyan-500 text-black rounded-full hover:bg-cyan-400 transition-all">
                     <Download className="w-5 h-5" />
                   </a>
-                  <button className="p-3 bg-zinc-800 text-white rounded-full hover:bg-red-500 transition-all" title="Delete from archives">
+                  <button 
+                    onClick={() => handleDelete(item.id)}
+                    className="p-3 bg-zinc-800 text-white rounded-full hover:bg-red-500 transition-all" 
+                    title="Delete from archives"
+                  >
                     <Trash2 className="w-5 h-5" />
                   </button>
                 </div>

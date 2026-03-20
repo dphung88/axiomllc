@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { generateVideo, pollVideoOperation } from '../services/veoService';
+import { saveToStudioGallery } from '../services/supabase';
 import { AspectRatio } from '../types';
 
 interface QuickGenLog {
@@ -85,6 +86,19 @@ export function QuickGenProvider({ children }: { children: React.ReactNode }) {
       const url = await pollVideoOperation(operation);
       addLog('Video generated successfully.', 'success');
       setState(prev => ({ ...prev, resultUrl: url, isGenerating: false }));
+      
+      // Auto-save to Supabase
+      saveToStudioGallery({
+        type: 'video',
+        url,
+        prompt: state.prompt,
+        settings: { 
+          source: 'quick-gen',
+          tab: state.activeTab,
+          aspectRatio: state.aspectRatio, 
+          model: state.veoModel 
+        }
+      });
     } catch (err: any) {
       let errorMsg = err?.message || (typeof err === 'string' ? err : 'Unknown error');
       if (errorMsg.includes('quota') || errorMsg.includes('429') || err?.status === 429 || err?.code === 429) {

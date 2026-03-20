@@ -118,22 +118,36 @@ export function StyleRemaker() {
       
       const extractedScenes = await analyzeVideoScenes(frames, targetSceneCount);
       
-      if (!extractedScenes || extractedScenes.length === 0) {
-        throw new Error("AI returned empty scene list. Try again or check your video content.");
+      if (!extractedScenes || !Array.isArray(extractedScenes) || extractedScenes.length === 0) {
+        throw new Error("AI returned an invalid or empty scene list. Please try a different style or video.");
       }
 
-      addLog(`Successfully decomposed into ${extractedScenes.length} scenes.`, 'success');
-      setScenes(extractedScenes);
+      // Final validation of scene object structure
+      const validatedScenes = extractedScenes.map((s, idx) => ({
+        sceneNumber: s.sceneNumber || idx + 1,
+        action: s.action || "No action described",
+        characters: s.characters || "None",
+        setting: s.setting || "Default environment",
+        mood: s.mood || "Neutral"
+      }));
+
+      addLog(`Successfully decomposed into ${validatedScenes.length} scenes.`, 'success');
+      setScenes(validatedScenes);
       setStep(3);
     } catch (error: any) {
-      console.error(error);
+      console.error("StyleRemaker Analysis Failed:", error);
       let errorMsg = error?.message || (typeof error === 'string' ? error : 'Unknown error');
-      if (errorMsg.includes('quota') || errorMsg.includes('429') || error?.status === 429 || error?.code === 429) {
-        showToast('API Quota Exceeded. Please check your Gemini API plan and billing details.');
+      
+      if (errorMsg.includes('quota') || errorMsg.includes('429')) {
+        showToast('Gemini API Quota Exceeded. Try again in 1 minute.');
+      } else if (errorMsg.includes('timeout')) {
+        showToast('Video processing timed out. Try a smaller file.');
+      } else if (errorMsg.includes('format') || errorMsg.includes('parse')) {
+        showToast('AI response format error. Retrying might fix it.');
       } else {
-        showToast('Failed to analyze video');
+        showToast(`Analysis error: ${errorMsg.substring(0, 50)}...`);
       }
-      addLog(`Analysis error: ${errorMsg}`, 'error');
+      addLog(`Analysis failure: ${errorMsg}`, 'error');
     } finally {
       setIsAnalyzing(false);
     }

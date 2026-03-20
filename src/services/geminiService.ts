@@ -61,7 +61,7 @@ export const generateSpeech = async (text: string, language: 'en' | 'vi') => {
     const voiceName = language === 'vi' ? 'Puck' : 'Kore';
     
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
+      model: "gemini-1.5-flash",
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: ["AUDIO"],
@@ -98,28 +98,61 @@ export const extractFrames = async (videoFile: File, numFrames: number = 5): Pro
     video.muted = true;
     video.crossOrigin = 'anonymous';
     
+    // Set a timeout to prevent infinite loading if video fails
+    const timeout = setTimeout(() => {
+      URL.revokeObjectURL(video.src);
+      reject(new Error('Video loading timeout. The file might be corrupted or incompatible.'));
+    }, 15000);
+
     video.onloadeddata = async () => {
+      clearTimeout(timeout);
       const duration = video.duration;
       const interval = duration / (numFrames + 1);
       const frames: string[] = [];
       const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      
+      // Limit resolution to reduce payload size (max 720px width/height)
+      const maxDim = 720;
+      let width = video.videoWidth;
+      let height = video.videoHeight;
+      if (width > maxDim || height > maxDim) {
+        const ratio = width / height;
+        if (width > height) {
+          width = maxDim;
+          height = maxDim / ratio;
+        } else {
+          height = maxDim;
+          width = maxDim * ratio;
+        }
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
       const ctx = canvas.getContext('2d');
       
-      for (let i = 1; i <= numFrames; i++) {
-        video.currentTime = interval * i;
-        await new Promise(r => {
-          video.onseeked = r;
-        });
-        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        frames.push(dataUrl.split(',')[1]);
+      try {
+        for (let i = 1; i <= numFrames; i++) {
+          video.currentTime = interval * i;
+          await new Promise(r => {
+            video.onseeked = r;
+          });
+          ctx?.drawImage(video, 0, 0, width, height);
+          // Use lower quality (0.6) to keep Base64 strings smaller
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+          frames.push(dataUrl.split(',')[1]);
+        }
+        URL.revokeObjectURL(video.src);
+        resolve(frames);
+      } catch (e) {
+        URL.revokeObjectURL(video.src);
+        reject(e);
       }
-      URL.revokeObjectURL(video.src);
-      resolve(frames);
     };
-    video.onerror = reject;
+    video.onerror = () => {
+      clearTimeout(timeout);
+      URL.revokeObjectURL(video.src);
+      reject(new Error('Failed to load video file.'));
+    };
   });
 };
 
@@ -147,18 +180,26 @@ Return ONLY a JSON array of ${targetSceneCount} objects.
 Format: [{"sceneNumber": 1, "action": "...", "characters": "...", "setting": "...", "mood": "..."}, ...]`;
 
   try {
+    // Switching to gemini-1.5-flash for faster analysis and better quota
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
-      contents: [{ role: 'user', parts: [...imageParts, { text: prompt }] }]
+      model: 'gemini-1.5-flash',
+      contents: [{ role: 'user', parts: [...imageParts, { text: prompt }] }],
+      config: {
+        responseMimeType: "application/json"
+      }
     });
     
-    let jsonResult = response.text;
+    let jsonResult = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text);
     
-    if (!jsonResult && response.candidates?.[0]?.content?.parts?.[0]?.text) {
-      jsonResult = response.candidates[0].content.parts[0].text;
+    if (!jsonResult) {
+      throw new Error("Empty response from AI. Please try a different video.");
     }
 
     const cleanJson = (text: string) => {
+      // Improved JSON extraction using regex
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) return jsonMatch[0];
+      
       let s = text.replace(/```json/g, "").replace(/```/g, "").trim();
       const start = s.indexOf("[");
       const end = s.lastIndexOf("]");
@@ -168,10 +209,18 @@ Format: [{"sceneNumber": 1, "action": "...", "characters": "...", "setting": "..
       return s;
     };
 
-    const parsed = JSON.parse(cleanJson(jsonResult));
-    return Array.isArray(parsed) ? parsed : [parsed];
+    try {
+      const parsed = JSON.parse(cleanJson(jsonResult));
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch (parseError) {
+      console.error("JSON Parse Error. Raw result:", jsonResult);
+      throw new Error("Failed to parse video analysis result. The AI response was not in the correct format.");
+    }
   } catch (error: any) {
     console.error("Gemini Video Analysis Error:", error);
+    if (error?.message?.includes('413') || error?.message?.includes('large')) {
+      throw new Error("Video payload too large. Try reducing the number of scenes or use a shorter video.");
+    }
     throw error;
   }
 };
@@ -197,7 +246,7 @@ Respond ONLY with a valid JSON object in this exact format:
     {
       "sceneNumber": 1,
       "action": "Brief description of what happens",
-      "prompt": "Highly detailed English prompt for an AI video generator (like Veo or Sora). Include camera angle, lighting, character appearance, action, and the specific visual style (${style}).",
+      "prompt": "Highly detailed English prompt for an AI video generator. Include camera angle, lighting, character appearance, action, and the specific visual style (${style}).",
       "narration": "The voiceover text for this scene (in the requested language). Keep it short and engaging."
     }
   ]
@@ -205,14 +254,14 @@ Respond ONLY with a valid JSON object in this exact format:
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-1.5-pro',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
       }
     });
     
-    const jsonResult = response.text || '{}';
+    const jsonResult = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text) || '{}';
     return JSON.parse(jsonResult);
   } catch (error) {
     console.error("AutoScript Error:", error);
@@ -256,14 +305,14 @@ Respond ONLY with a valid JSON object in this exact format:
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-1.5-pro',
       contents: [{ role: 'user', parts: [...imageParts, { text: prompt }] }],
       config: {
         responseMimeType: 'application/json',
       }
     });
     
-    const jsonResult = response.text || '{}';
+    const jsonResult = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text) || '{}';
     return JSON.parse(jsonResult);
   } catch (error) {
     console.error("ScriptFromVideo Error:", error);

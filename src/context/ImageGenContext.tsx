@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { generateImage } from '../services/geminiService';
+import { saveToStudioGallery } from '../services/supabase';
 import { useSettings } from './SettingsContext';
 
 interface Log {
@@ -90,6 +91,14 @@ export const ImageGenProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const url = await generateImage(prompt, aspectRatio, imageSize, model);
       setState(prev => ({ ...prev, resultUrl: url, isGenerating: false }));
       addLog('Image generated successfully!', 'success');
+      
+      // Auto-save to Supabase
+      saveToStudioGallery({
+        type: 'image',
+        url,
+        prompt,
+        settings: { aspectRatio, imageSize, model }
+      });
     } catch (err: any) {
       console.error(err);
       const msg = err.message || 'Failed to generate image';

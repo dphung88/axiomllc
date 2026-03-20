@@ -10,8 +10,8 @@ export const concatVideos = async (
       }
 
       const video = document.createElement('video');
-      video.crossOrigin = 'anonymous';
-      video.muted = true;
+      // Do NOT set crossOrigin — blob: URLs are same-origin and crossOrigin breaks them
+      video.muted = true; // Keep muted to satisfy autoplay policy
       video.playsInline = true;
       video.style.display = 'none';
       document.body.appendChild(video);
@@ -22,14 +22,6 @@ export const concatVideos = async (
         reject(new Error('Canvas 2D context not supported'));
         return;
       }
-
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const dest = audioCtx.createMediaStreamDestination();
-      
-      // Use the video element itself as the audio source for better synchronization
-      const sourceNode = audioCtx.createMediaElementSource(video);
-      sourceNode.connect(dest);
-      sourceNode.connect(audioCtx.destination); // Also connect to destination so we can hear it while assembling
 
       let currentIdx = 0;
       const chunks: Blob[] = [];
@@ -55,8 +47,6 @@ export const concatVideos = async (
           video.removeAttribute('src');
           video.load();
           if (video.parentNode) video.parentNode.removeChild(video);
-          
-          if (audioCtx.state !== 'closed') audioCtx.close();
         } catch (e) {
           console.error('Cleanup error', e);
         }
@@ -65,7 +55,7 @@ export const concatVideos = async (
       video.onended = () => {
         currentIdx++;
         if (onProgress) onProgress(currentIdx / scenes.length);
-        
+
         if (currentIdx < scenes.length) {
           video.src = scenes[currentIdx].videoUrl;
           video.play().catch(e => {
@@ -86,8 +76,8 @@ export const concatVideos = async (
       video.onloadedmetadata = () => {
         if (!recorder) {
           try {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+            canvas.width = video.videoWidth || 1280;
+            canvas.height = video.videoHeight || 720;
 
             // @ts-ignore
             stream = canvas.captureStream ? canvas.captureStream(30) : canvas.mozCaptureStream(30);
@@ -96,38 +86,36 @@ export const concatVideos = async (
               reject(new Error('captureStream not supported in this browser'));
               return;
             }
-            
-            dest.stream.getAudioTracks().forEach(track => stream!.addTrack(track));
-            
+
             const mimeTypes = [
               'video/mp4',
               'video/webm;codecs=h264,opus',
               'video/webm;codecs=vp9,opus',
               'video/webm;codecs=vp8,opus',
-              'video/webm'
+              'video/webm',
             ];
-            
+
             let options: MediaRecorderOptions = {};
             for (const mimeType of mimeTypes) {
               if (MediaRecorder.isTypeSupported(mimeType)) {
-                options = { mimeType, videoBitsPerSecond: 8000000 };
-                console.log('Selected MIME type:', mimeType);
+                options = { mimeType, videoBitsPerSecond: 8_000_000 };
+                console.log('[Assembly] Selected MIME type:', mimeType);
                 break;
               }
             }
-            
+
             recorder = new MediaRecorder(stream, options);
-            
+
             recorder.ondataavailable = (e) => {
               if (e.data && e.data.size > 0) chunks.push(e.data);
             };
-            
+
             recorder.onstop = () => {
               const blob = new Blob(chunks, { type: recorder?.mimeType || 'video/webm' });
               cleanup();
               resolve(URL.createObjectURL(blob));
             };
-            
+
             recorder.start(100);
             isRecording = true;
             drawFrame();
@@ -139,13 +127,16 @@ export const concatVideos = async (
       };
 
       video.onerror = () => {
-        const errorMsg = video.error ? video.error.message : 'Unknown error';
+        const code = video.error?.code ?? '?';
+        const msg = video.error?.message || '';
+        // MediaError codes: 1=ABORTED 2=NETWORK 3=DECODE 4=SRC_NOT_SUPPORTED
+        const detail = `code=${code}${msg ? ' ' + msg : ''}`;
         cleanup();
-        reject(new Error(`Error loading video ${currentIdx + 1}: ${errorMsg}`));
+        reject(new Error(`Error loading video ${currentIdx + 1}: ${detail}`));
       };
 
+      // Load and play the first scene (muted → autoplay allowed)
       video.src = scenes[0].videoUrl;
-      video.muted = false; // Unmute so AudioContext can capture sound
       video.play().catch(e => {
         cleanup();
         reject(new Error(`Failed to play first video: ${e.message}`));

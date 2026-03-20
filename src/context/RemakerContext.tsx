@@ -3,6 +3,7 @@ import { generateVideo, pollVideoOperation } from '../services/veoService';
 import { concatVideos } from '../services/videoAssemblyService';
 import { improveScenePrompt } from '../services/geminiService';
 import { saveToStudioGallery } from '../services/supabase';
+import { storeVideoBlob, getVideoBlob, clearAllVideoBlobs } from '../services/videoStorage';
 import { useSettings } from './SettingsContext';
 
 import { AspectRatio } from '../types';
@@ -119,25 +120,59 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
           );
         }
 
-        setState(prev => {
-          // Never restore hasApiKey from localStorage — always compute from current settings
-          const { hasApiKey: _ignored, ...parsedWithoutApiKey } = parsed;
-          const newState = {
-            ...prev,
-            ...parsedWithoutApiKey,
-            isGenerating: hasPendingVideos,
-            isAssembling: false
-          };
-          stateRef.current = newState;
-          return newState;
-        });
+        // Restore fresh blob URLs from IndexedDB for completed scenes
+        if (parsed.remadeScenes && parsed.remadeScenes.length > 0) {
+          const restoreUrls = async () => {
+            const restoredScenes = await Promise.all(
+              parsed.remadeScenes.map(async (s: any, i: number) => {
+                if (s.status === 'done') {
+                  const freshUrl = await getVideoBlob(`scene-${i}`);
+                  if (freshUrl) return { ...s, url: freshUrl };
+                  // Blob gone — mark for retry
+                  return { ...s, url: '', status: 'error', error: 'Session expired. Please retry.' };
+                }
+                return s;
+              })
+            );
+            parsed.remadeScenes = restoredScenes;
 
-        if (hasPendingVideos) {
-          setTimeout(() => {
-            if (stateRef.current.isGenerating) {
-              processQueue();
+            setState(prev => {
+              const { hasApiKey: _ignored, ...parsedWithoutApiKey } = parsed;
+              const newState = {
+                ...prev,
+                ...parsedWithoutApiKey,
+                isGenerating: hasPendingVideos,
+                isAssembling: false
+              };
+              stateRef.current = newState;
+              return newState;
+            });
+
+            if (hasPendingVideos) {
+              setTimeout(() => {
+                if (stateRef.current.isGenerating) processQueue();
+              }, 1000);
             }
-          }, 1000);
+          };
+          restoreUrls();
+        } else {
+          setState(prev => {
+            const { hasApiKey: _ignored, ...parsedWithoutApiKey } = parsed;
+            const newState = {
+              ...prev,
+              ...parsedWithoutApiKey,
+              isGenerating: hasPendingVideos,
+              isAssembling: false
+            };
+            stateRef.current = newState;
+            return newState;
+          });
+
+          if (hasPendingVideos) {
+            setTimeout(() => {
+              if (stateRef.current.isGenerating) processQueue();
+            }, 1000);
+          }
         }
       } catch (e) {
         console.error('Failed to parse remaker state', e);
@@ -307,6 +342,16 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (myGenerationId !== currentGenerationId || !activeTasks.has(taskKey)) return; 
 
           addLog(`Scene ${sceneIndexToProcess + 1} generated successfully.`, 'success');
+
+          // Persist blob to IndexedDB so it survives page refreshes
+          try {
+            const blobRes = await fetch(url);
+            const blob = await blobRes.blob();
+            await storeVideoBlob(`scene-${sceneIndexToProcess}`, blob);
+            addLog(`Scene ${sceneIndexToProcess + 1} saved to local storage.`, 'info');
+          } catch (storageErr) {
+            console.warn('[RemakerContext] IndexedDB store failed:', storageErr);
+          }
 
           // Auto-save each scene video to Supabase
           saveToStudioGallery({
@@ -500,10 +545,22 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const assembleFinalVideo = async () => {
     const { remadeScenes } = stateRef.current;
-    const scenesToMerge = remadeScenes
+
+    // Refresh blob URLs from IndexedDB — blob: URLs expire on page reload
+    addLog('Refreshing scene URLs from local storage...', 'info');
+    const freshScenes = await Promise.all(
+      remadeScenes.map(async (s, i) => {
+        if (!s.url && s.status !== 'done') return s;
+        const freshUrl = await getVideoBlob(`scene-${i}`);
+        if (freshUrl) return { ...s, url: freshUrl };
+        return s; // fall back to existing URL (same session)
+      })
+    );
+
+    const scenesToMerge = freshScenes
       .filter(s => s.url)
       .map(s => ({ videoUrl: s.url }));
-      
+
     if (scenesToMerge.length === 0) {
       addLog('Assembly failed: No successful scenes found to merge.', 'error');
       return;
@@ -546,6 +603,7 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.removeItem('remakerState');
     isSequentialLoopRunning = false;
     activeTasks.clear();
+    clearAllVideoBlobs(); // clear persisted video blobs
   };
 
   const openKeySelection = async () => {

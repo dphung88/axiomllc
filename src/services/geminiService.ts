@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { getApiKey } from './apiConfig';
+import { getApiKey, getLlmModel } from './apiConfig';
 import { saveToStudioGallery } from './supabase';
 
 function createWavFile(base64Data: string): string {
@@ -54,6 +54,7 @@ function createWavFile(base64Data: string): string {
 
 export const generateSpeech = async (text: string, language: 'en' | 'vi') => {
   const apiKey = getApiKey();
+  const model = getLlmModel();
   if (!apiKey) throw new Error('API Key is missing. Please select or enter an API key in Settings.');
   
   try {
@@ -61,7 +62,7 @@ export const generateSpeech = async (text: string, language: 'en' | 'vi') => {
     const voiceName = language === 'vi' ? 'Puck' : 'Kore';
     
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: model,
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: ["AUDIO"],
@@ -158,6 +159,7 @@ export const extractFrames = async (videoFile: File, numFrames: number = 5): Pro
 
 export const analyzeVideoScenes = async (framesBase64: string[], targetSceneCount: number = 5) => {
   const apiKey = getApiKey();
+  const model = getLlmModel();
   if (!apiKey) throw new Error('API Key is missing. Please select or enter an API key in Settings.');
   
   const ai = new GoogleGenAI({ apiKey });
@@ -180,13 +182,9 @@ Return ONLY a JSON array of ${targetSceneCount} objects.
 Format: [{"sceneNumber": 1, "action": "...", "characters": "...", "setting": "...", "mood": "..."}, ...]`;
 
   try {
-    // Switching to gemini-1.5-flash for faster analysis and better quota
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: [{ role: 'user', parts: [...imageParts, { text: prompt }] }],
-      config: {
-        responseMimeType: "application/json"
-      }
+      model: model,
+      contents: [{ role: 'user', parts: [...imageParts, { text: prompt }] }]
     });
     
     let jsonResult = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text);
@@ -227,6 +225,7 @@ Format: [{"sceneNumber": 1, "action": "...", "characters": "...", "setting": "..
 
 export const generateAutoScript = async (idea: string, style: string, sceneCount: number, language: 'en' | 'vi' | 'none' = 'en') => {
   const apiKey = getApiKey();
+  const model = getLlmModel();
   if (!apiKey) throw new Error('API Key is missing. Please select or enter an API key in Settings.');
   
   const ai = new GoogleGenAI({ apiKey });
@@ -254,11 +253,8 @@ Respond ONLY with a valid JSON object in this exact format:
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-pro',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-      }
+      model: model,
+      contents: prompt
     });
     
     const jsonResult = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text) || '{}';
@@ -271,6 +267,7 @@ Respond ONLY with a valid JSON object in this exact format:
 
 export const generateScriptFromVideo = async (framesBase64: string[], style: string, sceneCount: number, language: 'en' | 'vi' | 'none' = 'en') => {
   const apiKey = getApiKey();
+  const model = getLlmModel();
   if (!apiKey) throw new Error('API Key is missing. Please select or enter an API key in Settings.');
   
   const ai = new GoogleGenAI({ apiKey });
@@ -305,11 +302,8 @@ Respond ONLY with a valid JSON object in this exact format:
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-pro',
-      contents: [{ role: 'user', parts: [...imageParts, { text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-      }
+      model: model,
+      contents: [{ role: 'user', parts: [...imageParts, { text: prompt }] }]
     });
     
     const jsonResult = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text) || '{}';
@@ -322,6 +316,7 @@ Respond ONLY with a valid JSON object in this exact format:
 
 export const improveScenePrompt = async (currentAction: string, currentMood: string, style: string) => {
   const apiKey = getApiKey();
+  const model = getLlmModel();
   if (!apiKey) throw new Error('API Key is missing.');
   
   const ai = new GoogleGenAI({ apiKey });
@@ -340,11 +335,8 @@ export const improveScenePrompt = async (currentAction: string, currentMood: str
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-      }
+      model: model,
+      contents: prompt
     });
     
     const jsonResult = response.text || (response.candidates?.[0]?.content?.parts?.[0]?.text) || '{}';

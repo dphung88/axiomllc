@@ -17,9 +17,10 @@ export const generateVideo = async (
 ) => {
   const ai = getAiClient();
   
+  // For Free Tier, 720p is safer and more likely to succeed
   const config: any = {
     numberOfVideos: 1,
-    resolution,
+    resolution: resolution === '1080p' ? '720p' : resolution,
     aspectRatio,
   };
 

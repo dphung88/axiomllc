@@ -1,4 +1,17 @@
 
+export const getLlmModel = () => {
+  const saved = localStorage.getItem('studioSettings');
+  if (saved) {
+    try {
+      const settings = JSON.parse(saved);
+      return settings.llmModel || 'gemini-1.5-flash';
+    } catch (e) {
+      return 'gemini-1.5-flash';
+    }
+  }
+  return 'gemini-1.5-flash';
+};
+
 export const getApiKey = () => {
   const saved = localStorage.getItem('studioSettings');
   let key = '';

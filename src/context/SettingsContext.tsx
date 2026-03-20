@@ -5,6 +5,7 @@ interface SettingsState {
   projectName: string;
   storagePath: string;
   defaultModel: string;
+  llmModel: string;
   defaultAspectRatio: string;
   customApiKey: string;
 }
@@ -12,7 +13,8 @@ interface SettingsState {
 const initialState: SettingsState = {
   projectName: 'My Studio Project',
   storagePath: '/downloads/studio',
-  defaultModel: 'veo-3.1-fast-generate-preview',
+  defaultModel: 'veo-2.0-generate-001',
+  llmModel: 'gemini-1.5-flash',
   defaultAspectRatio: '16:9',
   customApiKey: '',
 };
@@ -22,6 +24,7 @@ interface SettingsContextType extends SettingsState {
   setProjectName: (name: string) => void;
   setStoragePath: (path: string) => void;
   setDefaultModel: (model: string) => void;
+  setLlmModel: (model: string) => void;
   setDefaultAspectRatio: (ratio: string) => void;
   setCustomApiKey: (key: string) => void;
   setDirectoryHandle: (handle: FileSystemDirectoryHandle | null) => void;
@@ -69,6 +72,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setProjectName: (projectName) => updateState({ projectName }),
       setStoragePath: (storagePath) => updateState({ storagePath }),
       setDefaultModel: (defaultModel) => updateState({ defaultModel }),
+      setLlmModel: (llmModel) => updateState({ llmModel }),
       setDefaultAspectRatio: (defaultAspectRatio) => updateState({ defaultAspectRatio }),
       setCustomApiKey: (customApiKey) => updateState({ customApiKey }),
       setDirectoryHandle: (handle) => setDirectoryHandle(handle),

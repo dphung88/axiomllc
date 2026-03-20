@@ -232,8 +232,7 @@ export function AutoStoryGen() {
                     onChange={(e) => setVeoModel(e.target.value)}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-cyan-500 font-sans focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 outline-none appearance-none transition-all"
                   >
-                    <option value="veo-3.1-fast-generate-preview">Veo 3.1 - Fast</option>
-                    <option value="veo-3.1-generate-preview">Veo 3.1 - High Quality</option>
+                    <option value="veo-2.0-generate-001">Veo 2.0 (Stable)</option>
                   </select>
                 </div>
               </div>

@@ -15,6 +15,12 @@ export interface RemadeScene {
   status?: 'queued' | 'processing' | 'done' | 'error';
 }
 
+export interface SystemLog {
+  time: string;
+  message: string;
+  type: 'info' | 'success' | 'error';
+}
+
 export interface RemakerState {
   step: number;
   originalVideoUrl: string | null;
@@ -32,6 +38,7 @@ export interface RemakerState {
   assemblyProgress: number;
   assemblyError: string | null;
   hasApiKey: boolean;
+  logs: SystemLog[];
 }
 
 const initialState: RemakerState = {
@@ -51,6 +58,7 @@ const initialState: RemakerState = {
   assemblyProgress: 0,
   assemblyError: null,
   hasApiKey: false,
+  logs: [],
 };
 
 // Background tasks map to survive unmounts
@@ -77,6 +85,7 @@ interface RemakerContextType extends RemakerState {
   reset: () => void;
   openKeySelection: () => Promise<void>;
   checkApiKey: () => Promise<boolean>;
+  addLog: (message: string, type?: 'info' | 'success' | 'error') => void;
   toastMessage: string | null;
   showToast: (msg: string) => void;
   clearToast: () => void;
@@ -167,6 +176,19 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
+  const addLog = useCallback((message: string, type: 'info' | 'success' | 'error' = 'info') => {
+    setState(prev => {
+      const newLog: SystemLog = {
+        time: new Date().toLocaleTimeString(),
+        message,
+        type
+      };
+      const newState = { ...prev, logs: [...prev.logs, newLog].slice(-100) }; // Keep last 100 logs
+      stateRef.current = newState;
+      return newState;
+    });
+  }, []);
+
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -199,6 +221,7 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         const delay = isQuotaError ? backoffDelays[attempt] : 5000;
         if (isQuotaError) {
+          addLog(`API Quota hit. Attempt ${attempt + 1}. Waiting ${delay/1000}s before retry...`, 'error');
           showToast(`Quota hit. Waiting ${delay/1000}s before auto-retry...`);
         }
         
@@ -262,6 +285,8 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
           Duration: ${duration} seconds. 
           High quality, detailed textures, consistent lighting.`;
 
+        addLog(`Processing Scene ${sceneIndexToProcess + 1}/${currentState.remadeScenes.length}...`, 'info');
+
         setState(prev => {
           const newScenes = [...prev.remadeScenes];
           newScenes[sceneIndexToProcess] = { 
@@ -279,6 +304,8 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         try {
           const url = await generateSceneWithRetry(sceneIndexToProcess, prompt, aspectRatio, veoModel);
           if (myGenerationId !== currentGenerationId || !activeTasks.has(taskKey)) return; 
+
+          addLog(`Scene ${sceneIndexToProcess + 1} generated successfully.`, 'success');
 
           // Auto-save each scene video to Supabase
           saveToStudioGallery({
@@ -312,18 +339,21 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
           if (isAllDone) {
             const allSuccessful = stateRef.current.remadeScenes.every(s => s.url && s.status === 'done');
             if (allSuccessful) {
+              addLog('All scenes generated successfully. Auto-starting master assembly...', 'success');
               showToast('All scenes done! Assembling master...');
               setTimeout(() => assembleFinalVideo(), 2000);
             } else {
+              addLog('Generation cycle complete with some errors. Manual retry required.', 'error');
               showToast('Some scenes failed. Please retry them manually.');
             }
           }
 
         } catch (error: any) {
           if (myGenerationId !== currentGenerationId || !activeTasks.has(taskKey)) return; 
+          const errorMessage = error?.message || (typeof error === 'string' ? error : 'Unknown error');
+          addLog(`Error in Scene ${sceneIndexToProcess + 1}: ${errorMessage}`, 'error');
           setState(prev => {
             const newScenes = [...prev.remadeScenes];
-            const errorMessage = error?.message || (typeof error === 'string' ? error : 'Unknown error');
             newScenes[sceneIndexToProcess] = { 
               ...newScenes[sceneIndexToProcess], 
               loading: false, 
@@ -375,13 +405,16 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
       url: '', loading: false, status: 'queued' as const
     }));
 
+    addLog(`Starting generation for ${initialRemadeScenes.length} scenes using ${currentState.veoModel}...`, 'info');
+
     const newState = {
       ...currentState,
       step: 4,
       isGenerating: true,
       remadeScenes: initialRemadeScenes,
       finalVideo: null,
-      isAssembling: false
+      isAssembling: false,
+      logs: [...currentState.logs, { time: new Date().toLocaleTimeString(), message: 'Initiating generation cycle...', type: 'info' as const }]
     };
 
     setState(newState);
@@ -468,13 +501,22 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
       .filter(s => s.url)
       .map(s => ({ videoUrl: s.url }));
       
-    if (scenesToMerge.length === 0) return;
+    if (scenesToMerge.length === 0) {
+      addLog('Assembly failed: No successful scenes found to merge.', 'error');
+      return;
+    }
 
+    addLog(`Assembling final master from ${scenesToMerge.length} scenes...`, 'info');
     updateState({ isAssembling: true, assemblyProgress: 0, assemblyError: null });
     try {
       const finalUrl = await concatVideos(scenesToMerge, (progress) => {
-        updateState({ assemblyProgress: Math.round(progress * 100) });
+        const percent = Math.round(progress * 100);
+        if (percent % 25 === 0 && percent > 0) {
+          addLog(`Assembly progress: ${percent}%`, 'info');
+        }
+        updateState({ assemblyProgress: percent });
       });
+      addLog('Master assembly complete!', 'success');
       updateState({ finalVideo: finalUrl, isAssembling: false, assemblyProgress: 100 });
 
       // Auto-save final assembled master video
@@ -485,8 +527,10 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         settings: { source: 'remaker-master', style: state.selectedStyle, sceneCount: state.scenes.length }
       });
     } catch (error: any) {
+      const errorMsg = error.message || 'Unknown error during assembly';
       console.error('Concat failed', error);
-      updateState({ isAssembling: false, assemblyError: error.message || 'Unknown error during assembly' });
+      addLog(`Master assembly failed: ${errorMsg}`, 'error');
+      updateState({ isAssembling: false, assemblyError: errorMsg });
       showToast('Failed to assemble video');
     }
   };
@@ -566,7 +610,7 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
       reset,
       openKeySelection,
       checkApiKey,
-      repromptScene,
+      addLog,
       toastMessage,
       showToast,
       clearToast

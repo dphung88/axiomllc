@@ -9,6 +9,7 @@ export function Settings() {
     projectName, setProjectName, 
     storagePath, setStoragePath, 
     defaultModel, setDefaultModel, 
+    llmModel, setLlmModel,
     defaultAspectRatio, setDefaultAspectRatio,
     customApiKey, setCustomApiKey,
     directoryHandle, setDirectoryHandle,
@@ -36,7 +37,7 @@ export function Settings() {
     try {
       const ai = new GoogleGenAI({ apiKey: customApiKey });
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: llmModel || 'gemini-1.5-flash',
         contents: 'Hello, are you working?',
       });
 
@@ -200,9 +201,23 @@ export function Settings() {
                   onChange={(e) => setDefaultModel(e.target.value)}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-cyan-500 font-sans focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none appearance-none transition-all"
                 >
-                  <option value="veo-3.1-fast-generate-preview">Veo 3.1 - Fast</option>
-                  <option value="veo-3.1-generate-preview">Veo 3.1 - High Quality</option>
+                  <option value="veo-2.0-generate-001">Veo 2.0 (Stable)</option>
+                  <option value="veo-3.1-fast-generate-preview">Veo 3.1 - Fast (Experimental)</option>
+                  <option value="veo-3.1-generate-preview">Veo 3.1 - High Quality (Experimental)</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-zinc-500 uppercase tracking-wider mb-3">AI Intelligence Model (LLM)</label>
+                <select 
+                  value={llmModel || 'gemini-1.5-flash'}
+                  onChange={(e) => setLlmModel(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-cyan-500 font-sans focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none appearance-none transition-all"
+                >
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast & Recommended for Free tier)</option>
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro (Powerful but strict quota/403 risks)</option>
+                </select>
+                <p className="mt-2 text-[10px] text-zinc-500 italic">If you see 403 Permission Denied errors, please switch to Flash model.</p>
               </div>
 
               <div>

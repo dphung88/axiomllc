@@ -38,48 +38,24 @@ export function StyleRemaker() {
     veoModel, setVeoModel,
     isGenerating, remadeScenes,
     finalVideo, isAssembling, assemblyProgress, assemblyError,
-    hasApiKey,
+    hasApiKey, logs,
     startGeneration, reGenerateAll, retryVariant, assembleFinalVideo, resumeGeneration, reset, showToast,
-    openKeySelection, repromptScene
+    openKeySelection, repromptScene, addLog
   } = useRemaker();
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [showFinalModal, setShowFinalModal] = useState(false);
-  const [logs, setLogs] = useState<{time: string, message: string, type: 'info' | 'success' | 'error'}[]>([]);
   const logsEndRef = useRef<HTMLDivElement>(null);
-
-  const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    setLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), message, type }]);
-  };
 
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
   useEffect(() => {
-    if (isGenerating) {
-      addLog('Started generating remade scenes...', 'info');
-    }
-  }, [isGenerating]);
-
-  useEffect(() => {
-    if (isAssembling) {
-      addLog(`Assembling final video... ${assemblyProgress}%`, 'info');
-    }
-  }, [isAssembling, assemblyProgress]);
-
-  useEffect(() => {
     if (finalVideo) {
-      addLog('Final video assembled successfully.', 'success');
       setShowFinalModal(true);
     }
   }, [finalVideo]);
-
-  useEffect(() => {
-    if (assemblyError) {
-      addLog(`Assembly error: ${assemblyError}`, 'error');
-    }
-  }, [assemblyError]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -104,23 +80,36 @@ export function StyleRemaker() {
   };
 
   const analyzeVideo = async () => {
-    if (!originalVideoUrl) return;
+    if (!originalVideoUrl) {
+      addLog('Error: No source video URL found.', 'error');
+      return;
+    }
+    
     setIsAnalyzing(true);
-    addLog('Analyzing video scenes...', 'info');
+    addLog('Starting Video Analysis Phase...', 'info');
+    
     try {
+      addLog(`Downloading source video from ${originalVideoUrl.substring(0, 30)}...`, 'info');
       const response = await fetch(originalVideoUrl);
+      if (!response.ok) throw new Error(`Network error while fetching video: ${response.statusText}`);
+      
       const blob = await response.blob();
+      addLog(`Video blob received (${Math.round(blob.size / 1024)} KB).`, 'info');
+      
       const file = new File([blob], "video.mp4", { type: blob.type });
       
-      addLog('Extracting frames...', 'info');
+      addLog(`Extracting ${targetSceneCount * 2} frames for AI analysis...`, 'info');
       const frames = await extractFrames(file, targetSceneCount * 2);
-      addLog(`Extracted ${frames.length} frames. Sending to Gemini AI...`, 'info');
+      addLog(`Successfully extracted ${frames.length} frames.`, 'success');
       
+      addLog('Sending visual data to Gemini 1.5 Flash...', 'info');
       const extractedScenes = await analyzeVideoScenes(frames, targetSceneCount);
       
       if (!extractedScenes || !Array.isArray(extractedScenes) || extractedScenes.length === 0) {
-        throw new Error("AI returned an invalid or empty scene list. Please try a different style or video.");
+        throw new Error("AI returned an invalid or empty scene list.");
       }
+
+      addLog(`AI Analysis complete. Processing ${extractedScenes.length} scenes.`, 'info');
 
       // Final validation of scene object structure
       const validatedScenes = extractedScenes.map((s, idx) => ({
@@ -131,7 +120,7 @@ export function StyleRemaker() {
         mood: s.mood || "Neutral"
       }));
 
-      addLog(`Successfully decomposed into ${validatedScenes.length} scenes.`, 'success');
+      addLog(`Validation successful. Decomposed into ${validatedScenes.length} scenes.`, 'success');
       setScenes(validatedScenes);
       setStep(3);
     } catch (error: any) {
@@ -139,19 +128,84 @@ export function StyleRemaker() {
       let errorMsg = error?.message || (typeof error === 'string' ? error : 'Unknown error');
       
       if (errorMsg.includes('quota') || errorMsg.includes('429')) {
+        addLog('Error: Gemini API Quota Exceeded (429). Please wait 60s.', 'error');
         showToast('Gemini API Quota Exceeded. Try again in 1 minute.');
       } else if (errorMsg.includes('timeout')) {
+        addLog('Error: Video processing timed out. Browser memory might be low.', 'error');
         showToast('Video processing timed out. Try a smaller file.');
       } else if (errorMsg.includes('format') || errorMsg.includes('parse')) {
+        addLog('Error: AI response format was invalid. JSON parsing failed.', 'error');
         showToast('AI response format error. Retrying might fix it.');
+      } else if (errorMsg.includes('fetch') || errorMsg.includes('network')) {
+        addLog(`Network Error: ${errorMsg}`, 'error');
       } else {
+        addLog(`System Error: ${errorMsg}`, 'error');
         showToast(`Analysis error: ${errorMsg.substring(0, 50)}...`);
       }
-      addLog(`Analysis failure: ${errorMsg}`, 'error');
     } finally {
       setIsAnalyzing(false);
     }
   };
+>>>>>>> SEARCH
+            {step === 2 && originalVideoUrl && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            {step === 2 && originalVideoUrl && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+                <div className="lg:col-span-8 space-y-6">
+>>>>>>> SEARCH
+                    <motion.button
+                      whileHover={{ scale: 1.02, boxShadow: "0 0 30px rgba(6,182,212,0.3)" }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={analyzeVideo}
+                      disabled={isAnalyzing}
+                      className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black px-10 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center gap-3 transition-all w-full justify-center shadow-2xl"
+                    >
+                      {isAnalyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
+                      {isAnalyzing ? 'ANALYZING FOOTAGE...' : 'BEGIN ANALYSIS'}
+                    </motion.button>
+                  </div>
+                </div>
+              </div>
+            )}
+                    <motion.button
+                      whileHover={{ scale: 1.02, boxShadow: "0 0 30px rgba(6,182,212,0.3)" }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={analyzeVideo}
+                      disabled={isAnalyzing}
+                      className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black px-10 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center gap-3 transition-all w-full justify-center shadow-2xl"
+                    >
+                      {isAnalyzing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
+                      {isAnalyzing ? 'ANALYZING FOOTAGE...' : 'BEGIN ANALYSIS'}
+                    </motion.button>
+                  </div>
+                </div>
+
+                {/* Inline System Logs for Phase 2 */}
+                <div className="lg:col-span-4 space-y-4">
+                  <div className="flex items-center gap-3 px-2">
+                    <Terminal className="w-4 h-4 text-cyan-500" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Analysis Engine Logs</span>
+                  </div>
+                  <div className="bg-black/40 border border-zinc-800 rounded-3xl p-6 h-[400px] overflow-y-auto font-mono text-[10px] space-y-2 scrollbar-thin">
+                    {logs.length === 0 ? (
+                      <div className="text-zinc-700 italic">Waiting for analysis start...</div>
+                    ) : (
+                      logs.map((log, i) => (
+                        <div key={i} className={`flex gap-3 leading-relaxed border-l-2 pl-3 ${
+                          log.type === 'error' ? 'text-red-400 border-red-500/50' : 
+                          log.type === 'success' ? 'text-cyan-400 border-cyan-500/50' : 
+                          'text-zinc-500 border-zinc-800'
+                        }`}>
+                          <span className="opacity-30 shrink-0 font-bold">[{log.time}]</span>
+                          <span className="break-words">{log.message}</span>
+                        </div>
+                      ))
+                    )}
+                    <div ref={logsEndRef} />
+                  </div>
+                </div>
+              </div>
+            )}
 
   const downloadAllClips = () => {
     addLog('Downloading all selected clips...', 'info');
@@ -542,8 +596,7 @@ export function StyleRemaker() {
                         onChange={(e) => setVeoModel(e.target.value)}
                         className="bg-zinc-900 border border-zinc-800 rounded-xl px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-zinc-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 appearance-none transition-all cursor-pointer"
                       >
-                        <option value="veo-3.1-fast-generate-preview">Veo 3.1 - Fast</option>
-                        <option value="veo-3.1-generate-preview">Veo 3.1 - High Quality</option>
+                        <option value="veo-2.0-generate-001">Veo 2.0 (Stable)</option>
                       </select>
                     </div>
                   </div>

@@ -14,7 +14,7 @@ const initialState: SettingsState = {
   projectName: 'My Studio Project',
   storagePath: '/downloads/studio',
   defaultModel: 'veo-2.0-generate-001',
-  llmModel: 'gemini-2.0-flash',
+  llmModel: 'gemini-2.5-flash',
   defaultAspectRatio: '16:9',
   customApiKey: '',
 };
@@ -38,9 +38,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const saved = localStorage.getItem('studioSettings');
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Auto-migrate deprecated 1.5 models to 2.0
-      if (parsed.llmModel?.startsWith('gemini-1.5')) {
-        parsed.llmModel = 'gemini-2.0-flash';
+      // Auto-migrate deprecated models to latest
+      if (parsed.llmModel?.startsWith('gemini-1.5') || parsed.llmModel === 'gemini-2.0-flash') {
+        parsed.llmModel = 'gemini-2.5-flash';
       }
       return parsed;
     }

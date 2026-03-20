@@ -14,7 +14,7 @@ const initialState: SettingsState = {
   projectName: 'My Studio Project',
   storagePath: '/downloads/studio',
   defaultModel: 'veo-2.0-generate-001',
-  llmModel: 'gemini-1.5-flash',
+  llmModel: 'gemini-2.0-flash',
   defaultAspectRatio: '16:9',
   customApiKey: '',
 };
@@ -36,7 +36,15 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<SettingsState>(() => {
     const saved = localStorage.getItem('studioSettings');
-    return saved ? JSON.parse(saved) : initialState;
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Auto-migrate from old broken model to new one
+      if (parsed.llmModel === 'gemini-1.5-flash') {
+        parsed.llmModel = 'gemini-2.0-flash';
+      }
+      return parsed;
+    }
+    return initialState;
   });
   const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
 

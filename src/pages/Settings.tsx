@@ -37,7 +37,7 @@ export function Settings() {
     try {
       const ai = new GoogleGenAI({ apiKey: customApiKey });
       const response = await ai.models.generateContent({
-        model: llmModel || 'gemini-1.5-flash',
+        model: llmModel || 'gemini-2.0-flash',
         contents: 'Hello, are you working?',
       });
 
@@ -211,14 +211,15 @@ export function Settings() {
                 <label className="block text-sm font-bold text-zinc-500 uppercase tracking-wider mb-3">AI Intelligence Model (LLM)</label>
                 <div className="flex flex-wrap gap-3">
                   {[
-                    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', desc: 'Fast & Recommended' },
+                    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'Newest & Fastest' },
+                    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', desc: 'Legacy Fast' },
                     { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', desc: 'Higher Intelligence' }
                   ].map(model => (
                     <button
                       key={model.id}
                       onClick={() => setLlmModel(model.id)}
                       className={`flex-1 min-w-[140px] p-4 rounded-xl border text-left transition-all ${
-                        (llmModel || 'gemini-1.5-flash') === model.id 
+                        (llmModel || 'gemini-2.0-flash') === model.id 
                           ? 'bg-cyan-500/10 border-cyan-500 text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.1)]' 
                           : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:border-zinc-700'
                       }`}

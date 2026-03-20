@@ -95,15 +95,28 @@ export const generateSpeech = async (text: string, language: 'en' | 'vi') => {
 export const extractFrames = async (videoFile: File, numFrames: number = 5): Promise<string[]> => {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
-    video.src = URL.createObjectURL(videoFile);
+    const videoUrl = URL.createObjectURL(videoFile);
+    
+    video.src = videoUrl;
     video.muted = true;
+    video.playsInline = true;
     video.crossOrigin = 'anonymous';
+    
+    // Force preload
+    video.preload = 'auto';
     
     // Set a timeout to prevent infinite loading if video fails
     const timeout = setTimeout(() => {
-      URL.revokeObjectURL(video.src);
-      reject(new Error('Video loading timeout. The file might be corrupted or incompatible.'));
-    }, 15000);
+      URL.revokeObjectURL(videoUrl);
+      reject(new Error('Video loading timeout (30s). The file might be too large, corrupted, or in an unsupported format.'));
+    }, 30000);
+
+    video.onloadedmetadata = () => {
+       // Ensure we have dimensions
+       if (video.videoWidth === 0 || video.videoHeight === 0) {
+         console.warn('Video dimensions not found in metadata, waiting for loadeddata');
+       }
+    };
 
     video.onloadeddata = async () => {
       clearTimeout(timeout);
@@ -112,40 +125,47 @@ export const extractFrames = async (videoFile: File, numFrames: number = 5): Pro
       const frames: string[] = [];
       const canvas = document.createElement('canvas');
       
-      // Limit resolution to reduce payload size (max 720px width/height)
-      const maxDim = 720;
-      let width = video.videoWidth;
-      let height = video.videoHeight;
-      if (width > maxDim || height > maxDim) {
-        const ratio = width / height;
-        if (width > height) {
-          width = maxDim;
-          height = maxDim / ratio;
-        } else {
-          height = maxDim;
-          width = maxDim * ratio;
-        }
+      // Lower resolution significantly for Gemini analysis to ensure we don't hit payload limits
+      // Gemini 1.5 doesn't need high res to understand scenes
+      const maxDim = 512; 
+      let width = video.videoWidth || 640;
+      let height = video.videoHeight || 360;
+      
+      const ratio = width / height;
+      if (width > height) {
+        width = maxDim;
+        height = maxDim / ratio;
+      } else {
+        height = maxDim;
+        width = maxDim * ratio;
       }
       
       canvas.width = width;
       canvas.height = height;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { alpha: false });
       
       try {
         for (let i = 1; i <= numFrames; i++) {
           video.currentTime = interval * i;
           await new Promise(r => {
-            video.onseeked = r;
+            const onSeeked = () => {
+              video.removeEventListener('seeked', onSeeked);
+              r(null);
+            };
+            video.addEventListener('seeked', onSeeked);
+            // Fallback for seeking
+            setTimeout(onSeeked, 2000);
           });
+          
           ctx?.drawImage(video, 0, 0, width, height);
-          // Use lower quality (0.6) to keep Base64 strings smaller
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+          // Use even lower quality (0.4) for analysis frames to save bandwidth
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.4);
           frames.push(dataUrl.split(',')[1]);
         }
-        URL.revokeObjectURL(video.src);
+        URL.revokeObjectURL(videoUrl);
         resolve(frames);
       } catch (e) {
-        URL.revokeObjectURL(video.src);
+        URL.revokeObjectURL(videoUrl);
         reject(e);
       }
     };

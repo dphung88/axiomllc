@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { extractFrames, analyzeVideoScenes } from '../services/geminiService';
 import { useRemaker } from '../context/RemakerContext';
 import { useSettings } from '../context/SettingsContext';
+import { getApiKey, getLlmModel } from '../services/apiConfig';
+import { GoogleGenAI } from '@google/genai';
 
 const STYLES = [
   'Cartoon', '2D Flat', 'Anime', 'Stop Motion', 'Noir', 'Pixel Art', 
@@ -101,7 +103,7 @@ export function StyleRemaker() {
       const frames = await extractFrames(file, targetSceneCount * 2);
       addLog(`Successfully extracted ${frames.length} frames.`, 'success');
       
-      addLog('Sending visual data to Gemini 1.5 Flash...', 'info');
+      addLog('Sending visual data to Gemini 2.0 Flash...', 'info');
       const extractedScenes = await analyzeVideoScenes(frames, targetSceneCount);
       
       if (!extractedScenes || !Array.isArray(extractedScenes) || extractedScenes.length === 0) {
@@ -141,6 +143,68 @@ export function StyleRemaker() {
         addLog(`System Error: ${errorMsg}`, 'error');
         showToast(`Analysis error: ${errorMsg.substring(0, 50)}...`);
       }
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const analyzeVideoDirectly = async () => {
+    if (!originalVideoUrl) return;
+    setIsAnalyzing(true);
+    addLog('Experimental: Analyzing video as a single file...', 'info');
+    try {
+      const response = await fetch(originalVideoUrl);
+      const blob = await response.blob();
+      
+      if (blob.size > 15 * 1024 * 1024) {
+         addLog('Video is too large (>15MB) for direct analysis. Using frame extraction instead...', 'warn');
+         return analyzeVideo();
+      }
+
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64String = (reader.result as string).split(',')[1];
+          resolve(base64String);
+        };
+      });
+      reader.readAsDataURL(blob);
+      const base64Video = await base64Promise;
+
+      addLog('Sending video to Gemini 2.0 Flash...', 'info');
+      
+      const apiKey = getApiKey();
+      const model = getLlmModel();
+      const ai = new GoogleGenAI({ apiKey });
+      
+      const prompt = `Analyze this video. Break it down into exactly ${targetSceneCount} distinct scenes.
+      Return ONLY a JSON array of ${targetSceneCount} objects. 
+      Format: [{"sceneNumber": 1, "action": "...", "characters": "...", "setting": "...", "mood": "..."}, ...]`;
+
+      const result = await ai.models.generateContent({
+        model: model,
+        contents: [{ role: 'user', parts: [
+          { inlineData: { mimeType: blob.type || 'video/mp4', data: base64Video } },
+          { text: prompt }
+        ] }]
+      });
+
+      const jsonResult = result.text || (result.candidates?.[0]?.content?.parts?.[0]?.text);
+      if (!jsonResult) throw new Error("Empty AI response");
+
+      // Reuse the same parsing logic
+      const cleanJson = (text: string) => {
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        return jsonMatch ? jsonMatch[0] : text;
+      };
+
+      const validatedScenes = JSON.parse(cleanJson(jsonResult));
+      setScenes(validatedScenes);
+      setStep(3);
+      addLog('Direct analysis successful!', 'success');
+    } catch (error: any) {
+      addLog(`Direct analysis failed: ${error.message}. Retrying with frames...`, 'warn');
+      return analyzeVideo();
     } finally {
       setIsAnalyzing(false);
     }
@@ -281,7 +345,7 @@ export function StyleRemaker() {
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={analyzeVideo}
+                      onClick={analyzeVideoDirectly}
                       disabled={isAnalyzing}
                       className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black px-10 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center gap-3 transition-all w-full justify-center shadow-2xl mt-8"
                     >

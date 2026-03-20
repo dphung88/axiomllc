@@ -4,12 +4,12 @@ export const getLlmModel = () => {
   if (saved) {
     try {
       const settings = JSON.parse(saved);
-      return settings.llmModel || 'gemini-1.5-flash';
+      return settings.llmModel || 'gemini-2.0-flash';
     } catch (e) {
-      return 'gemini-1.5-flash';
+      return 'gemini-2.0-flash';
     }
   }
-  return 'gemini-1.5-flash';
+  return 'gemini-2.0-flash';
 };
 
 export const getApiKey = () => {

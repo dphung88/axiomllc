@@ -107,40 +107,26 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Load from localStorage on mount
   useEffect(() => {
-    const checkKey = async () => {
-      // Priority 1: Custom API Key from settings
-      if (customApiKey) {
-        updateState({ hasApiKey: true });
-        return;
-      }
-      // Priority 2: AI Studio environment key
-      if (window.aistudio?.hasSelectedApiKey) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        updateState({ hasApiKey: hasKey });
-      } else {
-        updateState({ hasApiKey: false });
-      }
-    };
-    checkKey();
-
     const saved = localStorage.getItem('remakerState');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        
+
         let hasPendingVideos = false;
         if (parsed.remadeScenes && parsed.remadeScenes.length > 0) {
-          hasPendingVideos = parsed.remadeScenes.some((s: any) => 
-            s.variants.some((v: any) => (v.loading || v.status === 'processing' || v.status === 'queued') && !v.url && !v.error)
+          hasPendingVideos = parsed.remadeScenes.some((s: any) =>
+            s.loading || s.status === 'processing' || s.status === 'queued'
           );
         }
 
         setState(prev => {
-          const newState = { 
-            ...prev, 
-            ...parsed, 
-            isGenerating: hasPendingVideos, 
-            isAssembling: false 
+          // Never restore hasApiKey from localStorage — always compute from current settings
+          const { hasApiKey: _ignored, ...parsedWithoutApiKey } = parsed;
+          const newState = {
+            ...prev,
+            ...parsedWithoutApiKey,
+            isGenerating: hasPendingVideos,
+            isAssembling: false
           };
           stateRef.current = newState;
           return newState;
@@ -158,6 +144,21 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
     setIsLoaded(true);
+
+    // Check API key AFTER restoring state so it doesn't get overwritten
+    const checkKey = async () => {
+      if (customApiKey) {
+        updateState({ hasApiKey: true });
+        return;
+      }
+      if (window.aistudio?.hasSelectedApiKey) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        updateState({ hasApiKey: hasKey });
+      } else {
+        updateState({ hasApiKey: false });
+      }
+    };
+    checkKey();
   }, [customApiKey]);
 
   // Save to localStorage on change
@@ -387,7 +388,9 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const startGeneration = () => {
     const currentState = stateRef.current;
-    if (!currentState.hasApiKey) {
+    // Re-check customApiKey directly in case hasApiKey state is stale
+    const hasKey = currentState.hasApiKey || !!customApiKey;
+    if (!hasKey) {
       openKeySelection();
       return;
     }

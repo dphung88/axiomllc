@@ -11,7 +11,7 @@ export const concatVideos = async (
 
       const video = document.createElement('video');
       // Do NOT set crossOrigin — blob: URLs are same-origin and crossOrigin breaks them
-      video.muted = true; // Keep muted to satisfy autoplay policy
+      // Do NOT set muted — we capture audio via Web Audio API (silent to speakers)
       video.playsInline = true;
       video.style.display = 'none';
       document.body.appendChild(video);
@@ -21,6 +21,24 @@ export const concatVideos = async (
       if (!ctx) {
         reject(new Error('Canvas 2D context not supported'));
         return;
+      }
+
+      // Web Audio API — capture audio from video without playing through speakers
+      let audioCtx: AudioContext | null = null;
+      let audioSource: MediaElementAudioSourceNode | null = null;
+      let audioDestination: MediaStreamAudioDestinationNode | null = null;
+
+      try {
+        audioCtx = new AudioContext();
+        audioDestination = audioCtx.createMediaStreamDestination();
+        audioSource = audioCtx.createMediaElementSource(video);
+        // Connect source → destination only (NOT to audioCtx.destination = speakers)
+        audioSource.connect(audioDestination);
+        console.log('[Assembly] Web Audio API connected — audio will be captured');
+      } catch (audioErr) {
+        console.warn('[Assembly] Web Audio API unavailable, assembly will be silent:', audioErr);
+        audioCtx = null;
+        audioDestination = null;
       }
 
       let currentIdx = 0;
@@ -43,6 +61,8 @@ export const concatVideos = async (
           if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
           if (recorder && recorder.state !== 'inactive') recorder.stop();
           if (stream) stream.getTracks().forEach(t => t.stop());
+          if (audioSource) audioSource.disconnect();
+          if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
           video.pause();
           video.removeAttribute('src');
           video.load();
@@ -80,19 +100,32 @@ export const concatVideos = async (
             canvas.height = video.videoHeight || 720;
 
             // @ts-ignore
-            stream = canvas.captureStream ? canvas.captureStream(30) : canvas.mozCaptureStream(30);
-            if (!stream) {
+            const canvasStream: MediaStream = canvas.captureStream
+              // @ts-ignore
+              ? canvas.captureStream(30)
+              // @ts-ignore
+              : canvas.mozCaptureStream(30);
+
+            if (!canvasStream) {
               cleanup();
               reject(new Error('captureStream not supported in this browser'));
               return;
             }
 
+            // Combine canvas video tracks + audio destination tracks
+            const combinedTracks = [...canvasStream.getVideoTracks()];
+            if (audioDestination && audioDestination.stream.getAudioTracks().length > 0) {
+              combinedTracks.push(...audioDestination.stream.getAudioTracks());
+              console.log('[Assembly] Audio track added to recording stream');
+            }
+            stream = new MediaStream(combinedTracks);
+
             const mimeTypes = [
-              'video/mp4',
-              'video/webm;codecs=h264,opus',
               'video/webm;codecs=vp9,opus',
               'video/webm;codecs=vp8,opus',
+              'video/webm;codecs=h264,opus',
               'video/webm',
+              'video/mp4',
             ];
 
             let options: MediaRecorderOptions = {};
@@ -116,6 +149,11 @@ export const concatVideos = async (
               resolve(URL.createObjectURL(blob));
             };
 
+            // Resume AudioContext if suspended (browser requires user gesture)
+            if (audioCtx && audioCtx.state === 'suspended') {
+              audioCtx.resume().catch(console.warn);
+            }
+
             recorder.start(100);
             isRecording = true;
             drawFrame();
@@ -135,7 +173,7 @@ export const concatVideos = async (
         reject(new Error(`Error loading video ${currentIdx + 1}: ${detail}`));
       };
 
-      // Load and play the first scene (muted → autoplay allowed)
+      // Load and play the first scene
       video.src = scenes[0].videoUrl;
       video.play().catch(e => {
         cleanup();

@@ -247,7 +247,6 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     prompt: string,
     aspectRatio: AspectRatio,
     model: string,
-    lastFrame?: { data: string; mimeType: string },
     maxRetries = 5
   ) => {
     let attempt = 0;
@@ -255,7 +254,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     while (attempt <= maxRetries) {
       try {
-        const operation = await generateVideo(prompt, undefined, lastFrame, aspectRatio, '720p', model);
+        const operation = await generateVideo(prompt, undefined, undefined, aspectRatio, '720p', model);
         const url = await pollVideoOperation(operation);
         return url;
       } catch (error: any) {
@@ -328,8 +327,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
 
         try {
-          // Pass last frame from previous scene for character continuity
-          const url = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel, previousSceneLastFrame);
+          const url = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel);
           if (myGenerationId !== currentGenerationId) break;
 
           // Extract last frame of this scene to use as reference for next scene
@@ -498,21 +496,23 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       openKeySelection();
       return;
     }
+    // Increment id to break any running loop, then force-reset the lock
     currentGenerationId++;
+    isSequentialLoopRunning = false; // Fix: finally block won't reset when id changes
+
     setState(prev => {
       const newScenes = [...prev.scenesState];
       newScenes[sceneIndex] = { ...newScenes[sceneIndex], loading: false, status: 'queued', error: undefined, url: undefined };
       const newState = { ...prev, scenesState: newScenes, isGeneratingVideos: true };
-      
       const totalTasks = prev.scriptData?.scenes.length || 0;
       const completedTasks = newState.scenesState.filter(s => s.status === 'done' || s.status === 'error').length;
       newState.generationProgress = { current: completedTasks, total: totalTasks };
-      
       stateRef.current = newState;
       return newState;
     });
-    
-    setTimeout(processQueue, 0);
+
+    // Small delay so setState flushes before processQueue reads stateRef
+    setTimeout(processQueue, 100);
   };
 
   const upscaleVariant = async (sceneIndex: number) => {

@@ -59,26 +59,15 @@ export function ImageGen() {
     }
   };
 
-  const downloadImage = async (url: string, filename: string) => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = filename;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      // Delay revoke — Safari needs time to process the blob before it's freed
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-      }, 10000);
-    } catch {
-      // fallback: open original URL in new tab if fetch fails
-      window.open(url, '_blank');
-    }
+  const downloadImage = (url: string, filename: string) => {
+    // Use Supabase Storage ?download= param — forces download on all browsers including Safari
+    const a = document.createElement('a');
+    a.href = `${url}?download=${filename}`;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (

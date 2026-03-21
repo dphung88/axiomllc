@@ -46,15 +46,29 @@ export const downloadFile = async (
 
 /**
  * fetchAndDownload — fetches a URL and calls downloadFile.
- * Use this for cross-origin Supabase Storage URLs where <a download> is ignored.
+ * Handles both data: URLs (base64 images from Gemini) and https: URLs (Supabase Storage).
  */
 export const fetchAndDownload = async (
   url: string,
   filename: string,
   directoryHandle: FileSystemDirectoryHandle | null
 ): Promise<void> => {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-  const blob = await response.blob();
+  let blob: Blob;
+
+  if (url.startsWith('data:')) {
+    // data: URL — convert base64 to blob directly (fetch() returns ok=false for data: URLs)
+    const [header, base64] = url.split(',');
+    const mime = header.match(/:(.*?);/)?.[1] || 'application/octet-stream';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    blob = new Blob([bytes], { type: mime });
+  } else {
+    // https: URL (Supabase Storage etc.) — fetch normally
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    blob = await response.blob();
+  }
+
   await downloadFile(blob, filename, directoryHandle);
 };

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import { motion } from 'motion/react';
-import { Image as ImageIcon, Video, Download, Trash2, RefreshCw } from 'lucide-react';
+import { Image as ImageIcon, Video, Download, Trash2, RefreshCw, AlertTriangle, Loader2 } from 'lucide-react';
 
 interface GalleryItem {
   id: string;
@@ -12,23 +12,48 @@ interface GalleryItem {
   settings: any;
 }
 
+// Check if URL is a permanent Supabase Storage URL (not a dead blob/temp URL)
+const isValidStorageUrl = (url: string) =>
+  url.startsWith('https://') && url.includes('/storage/');
+
 export function Gallery() {
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const downloadFile = (item: GalleryItem) => {
-    const ext = item.type === 'video' ? 'mp4' : 'jpg';
-    const filename = `studio-${item.type}-${Date.now()}.${ext}`;
-    // Use Supabase Storage ?download= param — forces browser download directly,
-    // no blob URL needed, works on all browsers including Safari
-    const downloadUrl = `${item.url}?download=${filename}`;
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = filename;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const downloadFile = async (item: GalleryItem) => {
+    if (!isValidStorageUrl(item.url)) {
+      alert('This file has an expired temporary URL and cannot be downloaded. Please regenerate it.');
+      return;
+    }
+    setDownloadingId(item.id);
+    try {
+      // Fetch the file as blob (required for cross-origin download with filename)
+      const response = await fetch(item.url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      const ext = item.type === 'video'
+        ? (blob.type.includes('mp4') ? 'mp4' : 'webm')
+        : (blob.type.includes('png') ? 'png' : 'jpg');
+      const filename = `studio-${item.type}-${Date.now()}.${ext}`;
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      // Delay revoke so Safari has time to process before blob is freed
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }, 30000);
+    } catch (err) {
+      console.error('Download failed:', err);
+      alert('Download failed. Please try again.');
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const fetchGallery = async () => {
@@ -131,12 +156,18 @@ export function Gallery() {
               className="group relative bg-zinc-900/50 rounded-3xl border border-zinc-800/50 overflow-hidden flex flex-col"
             >
               <div className="aspect-square relative overflow-hidden bg-black flex items-center justify-center">
-                {item.type === 'image' ? (
+                {!isValidStorageUrl(item.url) ? (
+                  // Dead blob/temp URL — show expired state
+                  <div className="flex flex-col items-center justify-center gap-2 text-zinc-600 p-6">
+                    <AlertTriangle className="w-8 h-8 text-zinc-700" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-center">Expired<br/>Temporary URL</span>
+                  </div>
+                ) : item.type === 'image' ? (
                   <img src={item.url} alt={item.prompt} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                 ) : (
                   <video src={item.url} className="w-full h-full object-cover opacity-80" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => {e.currentTarget.pause(); e.currentTarget.currentTime = 0;}} />
                 )}
-                
+
                 <div className="absolute top-4 right-4">
                   {item.type === 'image' ? (
                     <ImageIcon className="w-5 h-5 text-white drop-shadow-lg" />
@@ -149,10 +180,14 @@ export function Gallery() {
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
                   <button
                     onClick={() => downloadFile(item)}
-                    className="p-3 bg-cyan-500 text-black rounded-full hover:bg-cyan-400 transition-all"
-                    title="Download"
+                    disabled={downloadingId === item.id || !isValidStorageUrl(item.url)}
+                    className="p-3 bg-cyan-500 text-black rounded-full hover:bg-cyan-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    title={isValidStorageUrl(item.url) ? 'Download' : 'Expired URL — cannot download'}
                   >
-                    <Download className="w-5 h-5" />
+                    {downloadingId === item.id
+                      ? <Loader2 className="w-5 h-5 animate-spin" />
+                      : <Download className="w-5 h-5" />
+                    }
                   </button>
                   <button
                     onClick={() => handleDelete(item.id)}

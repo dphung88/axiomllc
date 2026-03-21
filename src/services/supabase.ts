@@ -49,23 +49,31 @@ const resolveToStorageUrl = async (url: string, type: 'image' | 'video'): Promis
   // Already a permanent Supabase storage URL — no need to re-upload
   if (url.includes(supabaseUrl) && url.includes('/storage/')) return url;
 
-  try {
+  // Never store dead blob: URLs — they expire when the page closes
+  if (url.startsWith('blob:')) {
     let blob: Blob;
-
-    if (url.startsWith('data:')) {
-      blob = dataUrlToBlob(url);
-    } else {
-      // blob: or https: — fetch and get blob
+    try {
       const res = await fetch(url);
-      if (!res.ok) throw new Error(`Fetch failed: ${res.statusText}`);
+      if (!res.ok) throw new Error('Blob URL already expired');
       blob = await res.blob();
+    } catch {
+      throw new Error('[supabase] Blob URL expired before upload could complete. Cannot save to gallery.');
     }
-
     return await uploadToStorage(blob, type);
-  } catch (err) {
-    console.warn('[supabase] Could not upload to storage, using original URL:', err);
-    return url; // graceful fallback
   }
+
+  let blob: Blob;
+
+  if (url.startsWith('data:')) {
+    blob = dataUrlToBlob(url);
+  } else {
+    // https: external URL — fetch and re-upload to our storage
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Fetch failed: ${res.statusText}`);
+    blob = await res.blob();
+  }
+
+  return await uploadToStorage(blob, type);
 };
 
 export const saveToStudioGallery = async (data: {

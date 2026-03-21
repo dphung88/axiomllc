@@ -492,8 +492,8 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const retryVariant = (sceneIndex: number) => {
-    // Use stateRef (always current) instead of state (may be stale closure)
-    if (!stateRef.current.hasApiKey) {
+    // Allow retry if either AI Studio key or custom key is available
+    if (!stateRef.current.hasApiKey && !customApiKey) {
       openKeySelection();
       return;
     }
@@ -517,7 +517,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const upscaleVariant = async (sceneIndex: number) => {
-    if (!state.hasApiKey) {
+    if (!state.hasApiKey && !customApiKey) {
       openKeySelection();
       return;
     }
@@ -595,6 +595,9 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await window.aistudio.openSelectKey();
       const hasKey = await window.aistudio.hasSelectedApiKey();
       updateState({ hasApiKey: hasKey });
+    } else {
+      // Standalone app: go to Settings to enter a custom API key
+      window.location.href = '/settings';
     }
   };
 

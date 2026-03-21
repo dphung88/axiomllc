@@ -1,6 +1,58 @@
+const drawSubtitle = (ctx: CanvasRenderingContext2D, text: string, canvasWidth: number, canvasHeight: number) => {
+  const padding = 12;
+  const maxWidth = canvasWidth - padding * 4;
+  const fontSize = Math.max(16, Math.round(canvasHeight * 0.042));
+  ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+
+  // Word-wrap
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let line = '';
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+  if (line) lines.push(line);
+
+  const lineHeight = fontSize * 1.35;
+  const blockHeight = lines.length * lineHeight + padding * 2;
+  const blockY = canvasHeight - blockHeight - Math.round(canvasHeight * 0.04);
+
+  // Semi-transparent background
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  const bgX = padding;
+  const bgW = canvasWidth - padding * 2;
+  ctx.beginPath();
+  // @ts-ignore
+  if (ctx.roundRect) {
+    // @ts-ignore
+    ctx.roundRect(bgX, blockY, bgW, blockHeight, 8);
+  } else {
+    ctx.rect(bgX, blockY, bgW, blockHeight);
+  }
+  ctx.fill();
+
+  // Text
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  ctx.shadowBlur = 4;
+  lines.forEach((l, i) => {
+    ctx.fillText(l, canvasWidth / 2, blockY + padding + i * lineHeight);
+  });
+  ctx.shadowBlur = 0;
+};
+
 export const concatVideos = async (
-  scenes: { videoUrl: string; audioUrl?: string }[],
-  onProgress?: (p: number) => void
+  scenes: { videoUrl: string; audioUrl?: string; subtitle?: string }[],
+  onProgress?: (p: number) => void,
+  showSubtitles = false
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     try {
@@ -70,6 +122,10 @@ export const concatVideos = async (
       const drawFrame = () => {
         if (isRecording && !video.paused && !video.ended) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          if (showSubtitles) {
+            const sub = scenes[currentIdx]?.subtitle;
+            if (sub) drawSubtitle(ctx, sub, canvas.width, canvas.height);
+          }
         }
         animationFrameId = requestAnimationFrame(drawFrame);
       };

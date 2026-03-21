@@ -552,11 +552,12 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const assembleVideo = async () => {
-    const { scenesState } = state;
-    const scenesToMerge = scenesState.map(s => ({
+    const { scenesState, scriptData, showSubtitles } = state;
+    const scenesToMerge = scenesState.map((s, i) => ({
       videoUrl: s.url,
-      audioUrl: s.audioUrl
-    })).filter(s => s.videoUrl) as { videoUrl: string, audioUrl?: string }[];
+      audioUrl: s.audioUrl,
+      subtitle: scriptData?.scenes[i]?.narration
+    })).filter(s => s.videoUrl) as { videoUrl: string, audioUrl?: string; subtitle?: string }[];
     
     if (scenesToMerge.length === 0) return;
 
@@ -565,7 +566,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
       const finalUrl = await concatVideos(scenesToMerge, (progress) => {
         updateState({ assemblyProgress: Math.round(progress * 100) });
-      });
+      }, showSubtitles);
       updateState({ finalVideo: finalUrl, isAssembling: false, assemblyProgress: 100 });
 
       // Auto-save final assembled master video

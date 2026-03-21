@@ -14,9 +14,12 @@ interface GalleryItem {
   settings: any;
 }
 
-// Check if URL is a permanent Supabase Storage URL (not a dead blob/temp URL)
+// Check if URL is usable (not a dead blob: URL)
+// Valid: Supabase Storage https URLs, data: base64 URLs (never expire)
+// Invalid: blob: URLs (die on page refresh)
 const isValidStorageUrl = (url: string) =>
-  url.startsWith('https://') && url.includes('/storage/');
+  url.startsWith('data:') ||
+  (url.startsWith('https://') && url.includes('/storage/'));
 
 export function Gallery() {
   const { directoryHandle } = useSettings();
@@ -33,9 +36,17 @@ export function Gallery() {
     try {
       const ext = item.type === 'video' ? 'mp4' : 'jpg';
       const filename = `studio-${item.type}-${Date.now()}.${ext}`;
-      // fetchAndDownload: fetches blob from Supabase Storage, then saves via
-      // File System Access API (chosen folder) or falls back to browser Downloads
-      await fetchAndDownload(item.url, filename, directoryHandle);
+
+      if (item.url.startsWith('data:')) {
+        // data: base64 URL — convert to blob directly, no fetch needed
+        const res = await fetch(item.url);
+        const blob = await res.blob();
+        const { downloadFile } = await import('../utils/downloadHelper');
+        await downloadFile(blob, filename, directoryHandle);
+      } else {
+        // Supabase Storage https URL — fetch then save
+        await fetchAndDownload(item.url, filename, directoryHandle);
+      }
     } catch (err) {
       console.error('Download failed:', err);
       alert('Download failed. Please try again.');
@@ -145,7 +156,7 @@ export function Gallery() {
             >
               <div className="aspect-square relative overflow-hidden bg-black flex items-center justify-center">
                 {!isValidStorageUrl(item.url) ? (
-                  // Dead blob/temp URL — show expired state
+                  // Dead blob: URL — show expired state
                   <div className="flex flex-col items-center justify-center gap-2 text-zinc-600 p-6">
                     <AlertTriangle className="w-8 h-8 text-zinc-700" />
                     <span className="text-[9px] font-black uppercase tracking-widest text-center">Expired<br/>Temporary URL</span>

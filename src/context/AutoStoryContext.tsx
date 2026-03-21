@@ -492,7 +492,8 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const retryVariant = (sceneIndex: number) => {
-    if (!state.hasApiKey) {
+    // Use stateRef (always current) instead of state (may be stale closure)
+    if (!stateRef.current.hasApiKey) {
       openKeySelection();
       return;
     }

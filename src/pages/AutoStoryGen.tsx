@@ -580,11 +580,11 @@ export function AutoStoryGen() {
                                 <AlertCircle className="w-6 h-6 text-red-500 mx-auto mb-1" />
                                 <p className="text-[9px] text-red-400 line-clamp-2 mb-2 font-bold px-2">{scene.error}</p>
                                 <div className="flex items-center justify-center gap-2 w-full">
-                                  <button 
+                                  <button
                                     onClick={() => retryVariant(sceneIndex)}
-                                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-[9px] font-black uppercase transition-all"
+                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-red-500/30 hover:bg-red-500/50 active:bg-red-500/70 text-red-300 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer select-none"
                                   >
-                                    <RefreshCw className="w-3 h-3" /> Retry
+                                    <RefreshCw className="w-3.5 h-3.5" /> Retry
                                   </button>
                                   {scene.error.toLowerCase().includes('quota') && (
                                     <button 

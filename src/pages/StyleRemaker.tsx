@@ -591,9 +591,9 @@ export function StyleRemaker() {
                                   <AlertCircle className="w-4 h-4 text-red-500" />
                                   <button
                                     onClick={() => retryVariant(i)}
-                                    className="text-[9px] font-black text-red-400 hover:text-red-300 uppercase tracking-widest border border-red-500/30 px-2 py-0.5 rounded-md transition-colors"
+                                    className="flex items-center gap-1.5 text-[10px] font-black text-red-400 hover:text-red-200 active:text-white uppercase tracking-wider border border-red-500/40 hover:border-red-400 bg-red-500/10 hover:bg-red-500/20 px-3 py-1 rounded-lg transition-all cursor-pointer select-none"
                                   >
-                                    Retry
+                                    <RefreshCw className="w-3 h-3" /> Retry
                                   </button>
                                 </div>
                               ) : isProcessing ? (

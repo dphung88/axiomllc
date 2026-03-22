@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { generateVideo, pollVideoOperation } from '../services/veoService';
 import { concatVideos } from '../services/videoAssemblyService';
 import { improveScenePrompt, generateSpeech } from '../services/geminiService';
-import { saveToStudioGallery } from '../services/supabase';
+import { saveToStudioGallery, supabase } from '../services/supabase';
 import { storeVideoBlob, getVideoBlob, clearAllVideoBlobs } from '../services/videoStorage';
 import { useSettings } from './SettingsContext';
 
@@ -329,7 +329,7 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
           ? `${charPrefix}${customPrompt}`
           : `${charPrefix}A cinematic video in ${styleToUse} style. Action: ${scene.action}. ${scene.characters ? `Characters: ${scene.characters}.` : ''} ${scene.setting ? `Setting: ${scene.setting}.` : ''} Atmosphere: ${scene.mood}. Duration: ${duration} seconds. High quality, detailed textures, consistent lighting.`;
 
-        addLog(`Processing Scene ${sceneIndexToProcess + 1}/${currentState.remadeScenes.length}...`, 'info');
+        addLog(`Processing Scene ${sceneIndexToProcess + 1}/${currentState.remadeScenes.length}: "${prompt.substring(0, 80)}..."`, 'info');
 
         setState(prev => {
           const newScenes = [...prev.remadeScenes];
@@ -373,15 +373,30 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
             savedUrl = saved?.publicUrl || undefined;
           } catch (_) {}
 
-          // Generate TTS narration for this scene
+          // Generate TTS narration and upload to Supabase (blob URLs don't survive state save/restore)
           const narrationText = scenes[sceneIndexToProcess]?.action || '';
           let audioUrl: string | undefined;
           if (narrationText) {
             try {
-              audioUrl = await generateSpeech(narrationText, 'en');
-              addLog(`Scene ${sceneIndexToProcess + 1} narration generated.`, 'info');
-            } catch (ttsErr) {
-              console.warn('[RemakerContext] TTS failed:', ttsErr);
+              const blobUrl = await generateSpeech(narrationText, 'en');
+              // Fetch blob and upload to Supabase so URL is permanent
+              const audioRes = await fetch(blobUrl);
+              const audioBlob = await audioRes.blob();
+              const audioFilename = `audio/remaker-scene-${sceneIndexToProcess}-${Date.now()}.wav`;
+              const { error: audioUploadErr } = await supabase.storage
+                .from('studio-media')
+                .upload(audioFilename, audioBlob, { contentType: 'audio/wav', upsert: true });
+              if (!audioUploadErr) {
+                const { data: { publicUrl: audioPublicUrl } } = supabase.storage
+                  .from('studio-media')
+                  .getPublicUrl(audioFilename);
+                audioUrl = audioPublicUrl;
+                addLog(`Scene ${sceneIndexToProcess + 1} narration ready.`, 'info');
+              } else {
+                addLog(`Scene ${sceneIndexToProcess + 1} audio upload failed — no voice in assembly.`, 'error');
+              }
+            } catch (ttsErr: any) {
+              addLog(`Scene ${sceneIndexToProcess + 1} TTS failed: ${ttsErr.message}`, 'error');
             }
           }
 

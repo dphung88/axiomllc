@@ -374,7 +374,9 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
           } catch (_) {}
 
           // Generate TTS narration and upload to Supabase (blob URLs don't survive state save/restore)
-          const narrationText = scenes[sceneIndexToProcess]?.action || '';
+          // Prefer 'narration' field (voiceover text) over 'action' (brief description)
+          const scene = scenes[sceneIndexToProcess];
+          const narrationText = scene?.narration || scene?.action || '';
           let audioUrl: string | undefined;
           if (narrationText) {
             try {
@@ -409,7 +411,7 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
               url,
               savedUrl,
               audioUrl,
-              narration: narrationText,
+              narration: narrationText,  // store the text used for TTS
               status: 'done',
               startTime: undefined
             };

@@ -8,6 +8,7 @@ interface SettingsState {
   llmModel: string;
   defaultAspectRatio: string;
   customApiKey: string;
+  useVertexAI: boolean;
 }
 
 const initialState: SettingsState = {
@@ -17,6 +18,7 @@ const initialState: SettingsState = {
   llmModel: 'gemini-2.5-flash',
   defaultAspectRatio: '16:9',
   customApiKey: '',
+  useVertexAI: false,
 };
 
 interface SettingsContextType extends SettingsState {
@@ -27,6 +29,7 @@ interface SettingsContextType extends SettingsState {
   setLlmModel: (model: string) => void;
   setDefaultAspectRatio: (ratio: string) => void;
   setCustomApiKey: (key: string) => void;
+  setUseVertexAI: (val: boolean) => void;
   setDirectoryHandle: (handle: FileSystemDirectoryHandle | null) => void;
   resetSettings: () => void;
 }
@@ -83,6 +86,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setLlmModel: (llmModel) => updateState({ llmModel }),
       setDefaultAspectRatio: (defaultAspectRatio) => updateState({ defaultAspectRatio }),
       setCustomApiKey: (customApiKey) => updateState({ customApiKey }),
+      setUseVertexAI: (useVertexAI) => updateState({ useVertexAI }),
       setDirectoryHandle: (handle) => setDirectoryHandle(handle),
       resetSettings: () => {
         setState(initialState);

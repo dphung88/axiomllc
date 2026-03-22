@@ -32,3 +32,24 @@ export const getApiKey = () => {
 
   return key.trim();
 };
+
+/** Whether to route Veo video generation through Vertex AI (uses GCP $300 credits) */
+export const getUseVertexAI = (): boolean => {
+  const saved = localStorage.getItem('studioSettings');
+  if (saved) {
+    try {
+      const settings = JSON.parse(saved);
+      return !!settings.useVertexAI;
+    } catch (e) {
+      return false;
+    }
+  }
+  return false;
+};
+
+/** Supabase Edge Function base URL */
+export const getSupabaseEdgeUrl = (): string => {
+  const env = import.meta.env as Record<string, string | undefined>;
+  const url = env.VITE_SUPABASE_URL || '';
+  return url ? `${url}/functions/v1` : '';
+};

@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, Save, RefreshCw, FolderOpen, Database, Layout, Monitor, CheckCircle2, Key, AlertCircle, Loader2 } from 'lucide-react';
+import { Settings as SettingsIcon, Save, RefreshCw, FolderOpen, Database, Layout, Monitor, CheckCircle2, Key, AlertCircle, Loader2, Cpu, ExternalLink } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useSettings } from '../context/SettingsContext';
 import { GoogleGenAI } from '@google/genai';
 import { checkStorageBucket } from '../services/supabase';
 
 export function Settings() {
-  const { 
-    projectName, setProjectName, 
-    storagePath, setStoragePath, 
-    defaultModel, setDefaultModel, 
+  const {
+    projectName, setProjectName,
+    storagePath, setStoragePath,
+    defaultModel, setDefaultModel,
     llmModel, setLlmModel,
     defaultAspectRatio, setDefaultAspectRatio,
     customApiKey, setCustomApiKey,
+    useVertexAI, setUseVertexAI,
     directoryHandle, setDirectoryHandle,
-    resetSettings 
+    resetSettings
   } = useSettings();
 
   const [saved, setSaved] = useState(false);
@@ -255,6 +256,53 @@ export function Settings() {
                 <div className="flex items-center gap-3 text-white mb-6">
                   <Key className="w-5 h-5 text-cyan-500" />
                   <h3 className="text-xl font-bold uppercase tracking-tight">API Configuration</h3>
+                </div>
+
+                {/* Vertex AI toggle */}
+                <div className={`mb-6 rounded-2xl border p-5 transition-all ${useVertexAI ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-zinc-950 border-zinc-800'}`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className={`p-2 rounded-xl ${useVertexAI ? 'bg-emerald-500/10' : 'bg-zinc-800'}`}>
+                        <Cpu className={`w-5 h-5 ${useVertexAI ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                      </div>
+                      <div>
+                        <p className="text-white font-bold text-sm uppercase tracking-wider mb-1">
+                          Use GCP Credits for Video (Vertex AI)
+                        </p>
+                        <p className="text-zinc-500 text-xs leading-relaxed">
+                          Route Veo video generation through Vertex AI → charges go to your Google Cloud project → <strong className="text-zinc-300">uses $300 free trial credit</strong> instead of direct billing.
+                        </p>
+                        {useVertexAI && (
+                          <p className="mt-2 text-emerald-400 text-xs font-semibold">
+                            ✓ Active — Veo calls will use your GCP free credits
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {/* Toggle switch */}
+                    <button
+                      onClick={() => setUseVertexAI(!useVertexAI)}
+                      className={`relative shrink-0 w-12 h-6 rounded-full transition-colors duration-200 ${useVertexAI ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+                    >
+                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${useVertexAI ? 'translate-x-6' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
+
+                  {useVertexAI && (
+                    <div className="mt-4 pt-4 border-t border-emerald-500/20">
+                      <p className="text-xs text-zinc-400 font-semibold uppercase tracking-wider mb-2">One-time Setup Required:</p>
+                      <ol className="text-xs text-zinc-400 space-y-1 list-decimal list-inside leading-relaxed">
+                        <li>Create a <strong className="text-white">Google Cloud service account</strong> with role: <code className="text-emerald-400">Vertex AI User</code></li>
+                        <li>Download the <strong className="text-white">JSON key</strong> file</li>
+                        <li>In <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline">Supabase Dashboard</a> → Edge Functions → Secrets → add: <code className="text-emerald-400 break-all">GOOGLE_SA_JSON = (paste JSON content)</code></li>
+                        <li>Enable <strong className="text-white">Vertex AI API</strong> on your GCP project</li>
+                      </ol>
+                      <a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-cyan-400 text-xs font-semibold hover:text-cyan-300 transition-colors">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Open GCP Service Accounts
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">

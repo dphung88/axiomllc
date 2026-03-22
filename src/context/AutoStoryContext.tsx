@@ -14,6 +14,7 @@ export interface ScriptData {
 
 export interface SceneState {
   url?: string;
+  savedUrl?: string;         // permanent Supabase URL (use this for assembly)
   loading: boolean;
   error?: string;
   isUpscaling?: boolean;
@@ -24,6 +25,7 @@ export interface SceneState {
   audioError?: string;
   customPrompt?: string;     // user's custom reprompt override
   url2?: string;             // alternative variant URL
+  savedUrl2?: string;        // permanent Supabase URL for variant 2
   loading2?: boolean;        // loading state for alt variant
   error2?: string;           // error for alt variant
   activeVariant?: 1 | 2;    // which variant is currently selected (default 1)
@@ -349,8 +351,8 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             if (frame) previousSceneLastFrame = frame;
           });
 
-          // Auto-save each scene video
-          saveToStudioGallery({
+          // Auto-save each scene video and capture Supabase permanent URL
+          const savedUrl = await saveToStudioGallery({
             type: 'video',
             url,
             prompt: scene.prompt,
@@ -361,7 +363,11 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             const newScenes = [...prev.scenesState];
             newScenes[sceneIndexToProcess] = {
               ...newScenes[sceneIndexToProcess],
-              loading: false, url, resolution: '720p', status: 'done'
+              loading: false,
+              url,
+              // Use permanent Supabase URL for assembly (avoids Veo URL expiry/CORS)
+              savedUrl: savedUrl || url,
+              resolution: '720p', status: 'done'
             };
             const newState = { ...prev, scenesState: newScenes };
             
@@ -567,11 +573,16 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const assembleVideo = async () => {
     const { scenesState, scriptData, showSubtitles } = state;
-    const scenesToMerge = scenesState.map((s, i) => ({
-      videoUrl: s.activeVariant === 2 && s.url2 ? s.url2 : s.url,
-      audioUrl: s.audioUrl,
-      subtitle: scriptData?.scenes[i]?.narration
-    })).filter(s => s.videoUrl) as { videoUrl: string, audioUrl?: string; subtitle?: string }[];
+    const scenesToMerge = scenesState.map((s, i) => {
+      // Prefer permanent Supabase URL (CORS-safe, never expires) over raw Veo URL
+      const rawUrl = s.activeVariant === 2 && s.url2 ? s.url2 : s.url;
+      const savedUrl = s.activeVariant === 2 && s.savedUrl2 ? s.savedUrl2 : s.savedUrl;
+      return {
+        videoUrl: savedUrl || rawUrl,
+        audioUrl: s.audioUrl,
+        subtitle: scriptData?.scenes[i]?.narration
+      };
+    }).filter(s => s.videoUrl) as { videoUrl: string, audioUrl?: string; subtitle?: string }[];
     
     if (scenesToMerge.length === 0) return;
 
@@ -713,9 +724,15 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const url2 = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel);
 
+      const savedUrl2 = await saveToStudioGallery({
+        type: 'video', url: url2,
+        prompt: fullPrompt,
+        settings: { source: 'auto-story-variant2', index: sceneIndex, model: veoModel }
+      });
+
       setState(prev => {
         const newScenes = [...prev.scenesState];
-        newScenes[sceneIndex] = { ...newScenes[sceneIndex], loading2: false, url2, activeVariant: 2 };
+        newScenes[sceneIndex] = { ...newScenes[sceneIndex], loading2: false, url2, savedUrl2: savedUrl2 || url2, activeVariant: 2 };
         stateRef.current = { ...prev, scenesState: newScenes };
         return stateRef.current;
       });

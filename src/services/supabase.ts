@@ -81,10 +81,10 @@ export const saveToStudioGallery = async (data: {
   url: string;
   prompt: string;
   settings?: any;
-}) => {
+}): Promise<string | null> => {
   if (!supabaseUrl || !supabaseAnonKey) {
     console.warn('[Gallery] Supabase credentials missing, skipping auto-save.');
-    return;
+    return null;
   }
 
   let permanentUrl: string;
@@ -105,7 +105,7 @@ export const saveToStudioGallery = async (data: {
     } else {
       // For blob/https URLs that failed to upload — skip saving to avoid dead URLs in DB
       console.error('[Gallery] Cannot save video with temporary URL. Skipping gallery save.');
-      return;
+      return null;
     }
   }
 
@@ -125,8 +125,10 @@ export const saveToStudioGallery = async (data: {
       throw error;
     }
     console.log(`[Gallery] ✅ Saved ${data.type} to gallery.`);
+    return permanentUrl;
   } catch (dbErr: any) {
     console.error('[Gallery] ❌ DB save failure:', dbErr?.message || dbErr);
+    return null;
   }
 };
 

@@ -79,7 +79,17 @@ serve(async (req) => {
     const saJson = Deno.env.get('GOOGLE_SA_JSON')
     if (!saJson) throw new Error('GOOGLE_SA_JSON secret is not configured.')
 
-    const sa = JSON.parse(saJson)
+    let jsonStr = saJson.trim()
+    if ((jsonStr.startsWith("'") && jsonStr.endsWith("'")) ||
+        (jsonStr.startsWith('"') && jsonStr.endsWith('"'))) {
+      jsonStr = jsonStr.slice(1, -1)
+    }
+    let sa: Record<string, string>
+    try {
+      sa = JSON.parse(jsonStr)
+    } catch (e) {
+      throw new Error(`GOOGLE_SA_JSON invalid JSON. First 80 chars: [${saJson.substring(0, 80)}]. Err: ${e}`)
+    }
     const { operationName } = await req.json()
     if (!operationName) throw new Error('operationName is required')
 

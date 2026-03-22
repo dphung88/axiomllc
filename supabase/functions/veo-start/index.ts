@@ -74,7 +74,23 @@ serve(async (req) => {
     const saJson = Deno.env.get('GOOGLE_SA_JSON')
     if (!saJson) throw new Error('GOOGLE_SA_JSON secret is not configured in Supabase.')
 
-    const sa = JSON.parse(saJson)
+    // Debug: show first 80 chars to diagnose format issues
+    const preview = saJson.substring(0, 80).replace(/\n/g, '\\n')
+    console.log(`GOOGLE_SA_JSON preview: [${preview}]`)
+
+    // Strip outer quotes if user accidentally wrapped in single/double quotes
+    let jsonStr = saJson.trim()
+    if ((jsonStr.startsWith("'") && jsonStr.endsWith("'")) ||
+        (jsonStr.startsWith('"') && jsonStr.endsWith('"'))) {
+      jsonStr = jsonStr.slice(1, -1)
+    }
+
+    let sa: Record<string, string>
+    try {
+      sa = JSON.parse(jsonStr)
+    } catch (parseErr) {
+      throw new Error(`GOOGLE_SA_JSON is invalid JSON. First 80 chars: [${preview}]. Parse error: ${parseErr}`)
+    }
     const projectId = sa.project_id
     const location = 'us-central1'
 

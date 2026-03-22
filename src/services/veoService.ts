@@ -105,6 +105,11 @@ export const pollVideoOperation = async (
     return await vertexPoll(result._vertexOperation, onProgress);
   }
 
+  // If Vertex AI is enabled but operationName is missing, don't fall through to AI Studio
+  if (getUseVertexAI()) {
+    throw new Error('Vertex AI mode enabled but no operationName returned from veo-start. Check GOOGLE_SA_JSON secret in Supabase.');
+  }
+
   // ── Gemini Developer API mode ──
   const ai = getAiClient();
   let currentResult = result;

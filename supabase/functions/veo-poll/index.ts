@@ -50,23 +50,32 @@ async function getAccessToken(sa: Record<string, string>): Promise<string> {
   return data.access_token
 }
 
-/** Extract GCS URI from Vertex AI operation response (multiple possible formats) */
+/** Extract GCS URI from Vertex AI Veo operation response (multiple possible formats) */
 function extractGcsUri(response: Record<string, unknown>): string {
-  // Format 1: response.generateVideoResponse.generatedVideos[0].video.uri
-  const f1 = (response?.generateVideoResponse as any)?.generatedVideos?.[0]?.video?.uri
+  // Format 1: generatedSamples[0].video.uri  ← Vertex AI Veo fetchPredictOperation
+  const f1 = (response?.generatedSamples as any)?.[0]?.video?.uri
   if (f1) return f1
-  // Format 2: response.predictions[0].video.uri
-  const f2 = (response?.predictions as any)?.[0]?.video?.uri
+  // Format 2: generatedSamples[0].uri
+  const f2 = (response?.generatedSamples as any)?.[0]?.uri
   if (f2) return f2
-  // Format 3: response.predictions[0].videos[0].uri
-  const f3 = (response?.predictions as any)?.[0]?.videos?.[0]?.uri
+  // Format 3: generateVideoResponse.generatedVideos[0].video.uri
+  const f3 = (response?.generateVideoResponse as any)?.generatedVideos?.[0]?.video?.uri
   if (f3) return f3
-  // Format 4: response.videos[0].uri
-  const f4 = (response?.videos as any)?.[0]?.uri
+  // Format 4: predictions[0].video.uri
+  const f4 = (response?.predictions as any)?.[0]?.video?.uri
   if (f4) return f4
-  // Format 5: response.generatedVideos[0].uri
-  const f5 = (response?.generatedVideos as any)?.[0]?.uri
+  // Format 5: predictions[0].videos[0].uri
+  const f5 = (response?.predictions as any)?.[0]?.videos?.[0]?.uri
   if (f5) return f5
+  // Format 6: videos[0].uri
+  const f6 = (response?.videos as any)?.[0]?.uri
+  if (f6) return f6
+  // Format 7: generatedVideos[0].uri
+  const f7 = (response?.generatedVideos as any)?.[0]?.uri
+  if (f7) return f7
+  // Format 8: videos[0].video.uri
+  const f8 = (response?.videos as any)?.[0]?.video?.uri
+  if (f8) return f8
   return ''
 }
 
@@ -132,10 +141,19 @@ serve(async (req) => {
       throw new Error(`Video generation failed: ${JSON.stringify(pollData.error)}`)
     }
 
+    const videoResponse = pollData.response || {}
+
+    // Handle RAI (content safety) filter
+    if ((videoResponse as any).raiMediaFilteredCount > 0) {
+      const reasons = (videoResponse as any).raiMediaFilteredReasons || []
+      const hint = reasons[0] || 'Content was filtered by safety policy.'
+      throw new Error(`Content filtered: ${hint}`)
+    }
+
     // Extract video GCS URI
-    const gcsUri = extractGcsUri(pollData.response || {})
+    const gcsUri = extractGcsUri(videoResponse)
     if (!gcsUri) {
-      throw new Error(`No video URI found in response: ${JSON.stringify(pollData.response)}`)
+      throw new Error(`No video URI found. Response: ${JSON.stringify(videoResponse).substring(0, 500)}`)
     }
 
     // Download from GCS using service account token

@@ -409,7 +409,16 @@ export function StyleRemaker() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {scenes.map((scene, i) => (
                     <div key={i} className="bg-zinc-950/50 p-6 rounded-3xl border border-zinc-800/50">
-                      <div className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.2em] mb-4">Scene {i + 1}</div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.2em]">Scene {i + 1}</div>
+                        <button
+                          onClick={() => repromptScene(i)}
+                          className="flex items-center gap-1 text-[9px] font-black text-amber-400 hover:text-amber-200 uppercase tracking-wider border border-amber-500/30 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-1 rounded-lg transition-all cursor-pointer"
+                          title="Let AI improve this scene's prompt"
+                        >
+                          <RefreshCw className="w-2.5 h-2.5" /> AI Improve
+                        </button>
+                      </div>
                       <div className="space-y-4">
                         <textarea
                           value={scene.action || ''}

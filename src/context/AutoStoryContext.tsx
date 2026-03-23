@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { generateAutoScript, generateScriptFromVideo, extractFrames, generateSpeech } from '../services/geminiService';
 import { generateVideo, pollVideoOperation } from '../services/veoService';
 import { concatVideos } from '../services/videoAssemblyService';
-import { saveToStudioGallery } from '../services/supabase';
+import { saveToStudioGallery, supabase } from '../services/supabase';
 import { AspectRatio } from '../types';
 import { useSettings } from './SettingsContext';
 
@@ -452,12 +452,26 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // Start sequential video generation
       setTimeout(processQueue, 0);
 
-      // Generate Audio sequentially
+      // Generate Audio sequentially and upload to Supabase for persistence
       for (let sceneIndex = 0; sceneIndex < data.scenes.length; sceneIndex++) {
         const scene = data.scenes[sceneIndex];
         if (language !== 'none' && scene.narration) {
           try {
-            const audioUrl = await generateSpeech(scene.narration, language);
+            const blobUrl = await generateSpeech(scene.narration, language);
+            // Upload to Supabase so URL stays valid after long video generation
+            let audioUrl = blobUrl;
+            try {
+              const audioRes = await fetch(blobUrl);
+              const audioBlob = await audioRes.blob();
+              const audioFilename = `audio/autostory-scene-${sceneIndex}-${Date.now()}.wav`;
+              const { error: uploadErr } = await supabase.storage
+                .from('studio-media')
+                .upload(audioFilename, audioBlob, { contentType: 'audio/wav', upsert: true });
+              if (!uploadErr) {
+                const { data: { publicUrl } } = supabase.storage.from('studio-media').getPublicUrl(audioFilename);
+                audioUrl = publicUrl;
+              }
+            } catch (_) { /* keep blob URL as fallback */ }
             setState(prev => {
               const newScenes = [...prev.scenesState];
               newScenes[sceneIndex] = { ...newScenes[sceneIndex], audioLoading: false, audioUrl };
@@ -465,7 +479,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             });
           } catch (err: any) {
             let errorMsg = err?.message || (typeof err === 'string' ? err : 'Unknown error');
-            
+
             // Try to parse JSON error if it's a stringified JSON
             try {
               if (typeof errorMsg === 'string' && errorMsg.includes('{')) {
@@ -479,10 +493,10 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             }
             setState(prev => {
               const newScenes = [...prev.scenesState];
-              newScenes[sceneIndex] = { ...newScenes[sceneIndex], audioLoading: false, audioError: errorMsg };
+              newScenes[sceneIndex] = { ...newScenes[sceneIndex], audioLoading: false, audioError: `TTS Scene ${sceneIndex + 1} failed: ${errorMsg}` };
               return { ...prev, scenesState: newScenes };
             });
-            
+
             if (errorMsg.includes('Quota Exceeded')) {
               break;
             }

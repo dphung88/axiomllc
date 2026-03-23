@@ -93,6 +93,22 @@ export function AutoStoryGen() {
     }
   }, [isAssembling, assemblyProgress, assemblyError, finalVideo]);
 
+  // Log TTS results as they come in (track logged indices to avoid duplicates)
+  const loggedTtsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    scenesState.forEach((scene, i) => {
+      const doneKey = `done-${i}`;
+      const errKey = `err-${i}`;
+      if (scene.audioUrl && !scene.audioLoading && !loggedTtsRef.current.has(doneKey)) {
+        loggedTtsRef.current.add(doneKey);
+        addLog(`Scene ${i + 1} voice narration ready.`, "success");
+      } else if (scene.audioError?.startsWith('TTS Scene') && !loggedTtsRef.current.has(errKey)) {
+        loggedTtsRef.current.add(errKey);
+        addLog(scene.audioError, "error");
+      }
+    });
+  }, [scenesState]);
+
   useEffect(() => {
     if (logsContainerRef.current) {
       logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;

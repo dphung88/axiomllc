@@ -750,9 +750,15 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const scene = scriptData.scenes[sceneIndex];
     const sceneState = stateRef.current.scenesState[sceneIndex];
 
+    // Determine which slot to write: replace the active variant, or fill variant 2 if both empty
+    // activeVariant 1 → replace slot 1 (url/savedUrl); activeVariant 2 → replace slot 2 (url2/savedUrl2)
+    const targetSlot: 1 | 2 = sceneState.activeVariant === 2 ? 2 : (sceneState.url ? 2 : 1);
+
     setState(prev => {
       const newScenes = [...prev.scenesState];
-      newScenes[sceneIndex] = { ...newScenes[sceneIndex], loading2: true, error2: undefined };
+      newScenes[sceneIndex] = targetSlot === 1
+        ? { ...newScenes[sceneIndex], loading: true, error: undefined }
+        : { ...newScenes[sceneIndex], loading2: true, error2: undefined };
       return { ...prev, scenesState: newScenes };
     });
 
@@ -763,24 +769,28 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const characterLock = characterStyle ? `Character style lock: ${characterStyle}. ` : '';
       const fullPrompt = characterLock + characterPrefix + (sceneState.customPrompt || scene.prompt);
 
-      const url2 = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel);
+      const newUrl = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel);
 
-      const savedUrl2 = await saveToStudioGallery({
-        type: 'video', url: url2,
+      const savedNewUrl = await saveToStudioGallery({
+        type: 'video', url: newUrl,
         prompt: fullPrompt,
-        settings: { source: 'auto-story-variant2', index: sceneIndex, model: veoModel }
+        settings: { source: `auto-story-variant${targetSlot}`, index: sceneIndex, model: veoModel }
       });
 
       setState(prev => {
         const newScenes = [...prev.scenesState];
-        newScenes[sceneIndex] = { ...newScenes[sceneIndex], loading2: false, url2, savedUrl2: savedUrl2 || url2, activeVariant: 2 };
+        newScenes[sceneIndex] = targetSlot === 1
+          ? { ...newScenes[sceneIndex], loading: false, url: newUrl, savedUrl: savedNewUrl || newUrl, status: 'done', activeVariant: 1 }
+          : { ...newScenes[sceneIndex], loading2: false, url2: newUrl, savedUrl2: savedNewUrl || newUrl, activeVariant: 2 };
         stateRef.current = { ...prev, scenesState: newScenes };
         return stateRef.current;
       });
     } catch (error: any) {
       setState(prev => {
         const newScenes = [...prev.scenesState];
-        newScenes[sceneIndex] = { ...newScenes[sceneIndex], loading2: false, error2: error?.message || 'Alt generation failed' };
+        newScenes[sceneIndex] = targetSlot === 1
+          ? { ...newScenes[sceneIndex], loading: false, error: error?.message || 'Regeneration failed', status: 'error' }
+          : { ...newScenes[sceneIndex], loading2: false, error2: error?.message || 'Alt generation failed' };
         return { ...prev, scenesState: newScenes };
       });
     }

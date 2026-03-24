@@ -260,6 +260,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     prompt: string,
     aspectRatio: AspectRatio,
     model: string,
+    lastFrame?: { data: string; mimeType: string },
     maxRetries = 5
   ) => {
     let attempt = 0;
@@ -267,12 +268,12 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     while (attempt <= maxRetries) {
       try {
-        const operation = await generateVideo(prompt, undefined, undefined, aspectRatio, '720p', model);
+        const operation = await generateVideo(prompt, undefined, lastFrame, aspectRatio, '720p', model);
         const url = await pollVideoOperation(operation);
         return url;
       } catch (error: any) {
         console.error(`Generation failed (Attempt ${attempt + 1}/${maxRetries + 1}):`, error);
-        
+
         const errorMsg = error?.message?.toLowerCase() || (typeof error === 'string' ? error.toLowerCase() : '');
         const isQuotaError = errorMsg.includes('quota') || errorMsg.includes('429') || error?.status === 429 || error?.code === 429 || errorMsg.includes('too many requests');
 
@@ -343,13 +344,13 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
 
         try {
-          const url = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel);
+          // Pass last frame of previous scene so Veo maintains character consistency
+          const url = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel, previousSceneLastFrame);
           if (myGenerationId !== currentGenerationId) break;
 
-          // Extract last frame of this scene to use as reference for next scene
-          extractLastFrame(url).then(frame => {
-            if (frame) previousSceneLastFrame = frame;
-          });
+          // Extract last frame of this scene to use as reference for next scene (await so it's ready)
+          const frame = await extractLastFrame(url).catch(() => undefined);
+          if (frame) previousSceneLastFrame = frame;
 
           // Auto-save each scene video and capture Supabase permanent URL
           const savedUrl = await saveToStudioGallery({
@@ -456,53 +457,57 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       for (let sceneIndex = 0; sceneIndex < data.scenes.length; sceneIndex++) {
         const scene = data.scenes[sceneIndex];
         if (language !== 'none' && scene.narration) {
-          try {
-            const blobUrl = await generateSpeech(scene.narration, language);
-            // Upload to Supabase so URL stays valid after long video generation
-            let audioUrl = blobUrl;
+          let ttsSuccess = false;
+          let ttsAttempts = 0;
+          while (!ttsSuccess && ttsAttempts < 3) {
             try {
-              const audioRes = await fetch(blobUrl);
-              const audioBlob = await audioRes.blob();
-              const audioFilename = `audio/autostory-scene-${sceneIndex}-${Date.now()}.wav`;
-              const { error: uploadErr } = await supabase.storage
-                .from('studio-media')
-                .upload(audioFilename, audioBlob, { contentType: 'audio/wav', upsert: true });
-              if (!uploadErr) {
-                const { data: { publicUrl } } = supabase.storage.from('studio-media').getPublicUrl(audioFilename);
-                audioUrl = publicUrl;
+              const blobUrl = await generateSpeech(scene.narration, language);
+              // Upload to Supabase so URL stays valid after long video generation
+              let audioUrl = blobUrl;
+              try {
+                const audioRes = await fetch(blobUrl);
+                const audioBlob = await audioRes.blob();
+                const audioFilename = `audio/autostory-scene-${sceneIndex}-${Date.now()}.wav`;
+                const { error: uploadErr } = await supabase.storage
+                  .from('studio-media')
+                  .upload(audioFilename, audioBlob, { contentType: 'audio/wav', upsert: true });
+                if (!uploadErr) {
+                  const { data: { publicUrl } } = supabase.storage.from('studio-media').getPublicUrl(audioFilename);
+                  audioUrl = publicUrl;
+                }
+              } catch (_) { /* keep blob URL as fallback */ }
+              setState(prev => {
+                const newScenes = [...prev.scenesState];
+                newScenes[sceneIndex] = { ...newScenes[sceneIndex], audioLoading: false, audioUrl };
+                return { ...prev, scenesState: newScenes };
+              });
+              ttsSuccess = true;
+            } catch (err: any) {
+              ttsAttempts++;
+              let errorMsg = err?.message || (typeof err === 'string' ? err : 'Unknown error');
+              try {
+                if (typeof errorMsg === 'string' && errorMsg.includes('{')) {
+                  const json = JSON.parse(errorMsg.substring(errorMsg.indexOf('{')));
+                  if (json.error?.message) errorMsg = json.error.message;
+                }
+              } catch (e) {}
+
+              const isQuota = errorMsg.toLowerCase().includes('quota') || errorMsg.includes('429') || err?.status === 429 || err?.code === 429;
+              if (isQuota && ttsAttempts < 3) {
+                // Wait 65s then retry (TTS free tier: 15 RPM, resets every minute)
+                await new Promise(resolve => setTimeout(resolve, 65000));
+              } else {
+                setState(prev => {
+                  const newScenes = [...prev.scenesState];
+                  newScenes[sceneIndex] = { ...newScenes[sceneIndex], audioLoading: false, audioError: `TTS Scene ${sceneIndex + 1} failed: ${errorMsg}` };
+                  return { ...prev, scenesState: newScenes };
+                });
+                break;
               }
-            } catch (_) { /* keep blob URL as fallback */ }
-            setState(prev => {
-              const newScenes = [...prev.scenesState];
-              newScenes[sceneIndex] = { ...newScenes[sceneIndex], audioLoading: false, audioUrl };
-              return { ...prev, scenesState: newScenes };
-            });
-          } catch (err: any) {
-            let errorMsg = err?.message || (typeof err === 'string' ? err : 'Unknown error');
-
-            // Try to parse JSON error if it's a stringified JSON
-            try {
-              if (typeof errorMsg === 'string' && errorMsg.includes('{')) {
-                const json = JSON.parse(errorMsg.substring(errorMsg.indexOf('{')));
-                if (json.error?.message) errorMsg = json.error.message;
-              }
-            } catch (e) {}
-
-            if (errorMsg.toLowerCase().includes('quota') || errorMsg.includes('429') || err?.status === 429 || err?.code === 429) {
-              errorMsg = 'API Quota Exceeded. Please click the "Key" icon to select your own Gemini API key for higher limits.';
-            }
-            setState(prev => {
-              const newScenes = [...prev.scenesState];
-              newScenes[sceneIndex] = { ...newScenes[sceneIndex], audioLoading: false, audioError: `TTS Scene ${sceneIndex + 1} failed: ${errorMsg}` };
-              return { ...prev, scenesState: newScenes };
-            });
-
-            if (errorMsg.includes('Quota Exceeded')) {
-              break;
             }
           }
-          // Add a small delay between audio generations
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // 5s delay between scenes to stay within TTS rate limits
+          await new Promise(resolve => setTimeout(resolve, 5000));
         }
       }
       

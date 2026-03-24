@@ -379,26 +379,38 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const narrationText = scene?.narration || scene?.action || '';
           let audioUrl: string | undefined;
           if (narrationText) {
-            try {
-              const blobUrl = await generateSpeech(narrationText, 'en');
-              // Fetch blob and upload to Supabase so URL is permanent
-              const audioRes = await fetch(blobUrl);
-              const audioBlob = await audioRes.blob();
-              const audioFilename = `audio/remaker-scene-${sceneIndexToProcess}-${Date.now()}.wav`;
-              const { error: audioUploadErr } = await supabase.storage
-                .from('studio-media')
-                .upload(audioFilename, audioBlob, { contentType: 'audio/wav', upsert: true });
-              if (!audioUploadErr) {
-                const { data: { publicUrl: audioPublicUrl } } = supabase.storage
+            let ttsAttempts = 0;
+            while (ttsAttempts < 3) {
+              try {
+                const blobUrl = await generateSpeech(narrationText, 'en');
+                const audioRes = await fetch(blobUrl);
+                const audioBlob = await audioRes.blob();
+                const audioFilename = `audio/remaker-scene-${sceneIndexToProcess}-${Date.now()}.wav`;
+                const { error: audioUploadErr } = await supabase.storage
                   .from('studio-media')
-                  .getPublicUrl(audioFilename);
-                audioUrl = audioPublicUrl;
-                addLog(`Scene ${sceneIndexToProcess + 1} narration ready.`, 'info');
-              } else {
-                addLog(`Scene ${sceneIndexToProcess + 1} audio upload failed — no voice in assembly.`, 'error');
+                  .upload(audioFilename, audioBlob, { contentType: 'audio/wav', upsert: true });
+                if (!audioUploadErr) {
+                  const { data: { publicUrl: audioPublicUrl } } = supabase.storage
+                    .from('studio-media')
+                    .getPublicUrl(audioFilename);
+                  audioUrl = audioPublicUrl;
+                  addLog(`Scene ${sceneIndexToProcess + 1} narration ready.`, 'info');
+                } else {
+                  addLog(`Scene ${sceneIndexToProcess + 1} audio upload failed — no voice in assembly.`, 'error');
+                }
+                break; // success
+              } catch (ttsErr: any) {
+                ttsAttempts++;
+                const msg = ttsErr.message || '';
+                const isQuota = msg.toLowerCase().includes('quota') || msg.includes('429');
+                if (isQuota && ttsAttempts < 3) {
+                  addLog(`Scene ${sceneIndexToProcess + 1} TTS quota hit, retrying in 65s...`, 'info');
+                  await new Promise(r => setTimeout(r, 65000));
+                } else {
+                  addLog(`Scene ${sceneIndexToProcess + 1} TTS failed: ${msg}`, 'error');
+                  break;
+                }
               }
-            } catch (ttsErr: any) {
-              addLog(`Scene ${sceneIndexToProcess + 1} TTS failed: ${ttsErr.message}`, 'error');
             }
           }
 

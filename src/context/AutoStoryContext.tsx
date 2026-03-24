@@ -540,9 +540,16 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
+  // Parse "Please retry in Xs" from Gemini quota error message
+  const parseRetryDelay = (errMsg: string): number => {
+    const match = errMsg.match(/retry in ([\d.]+)s/i);
+    if (match) return Math.ceil(parseFloat(match[1])) * 1000 + 3000; // exact wait + 3s buffer
+    return 65000; // default 65s if not parseable
+  };
+
   // Helper: generate TTS for one narration text with retry on quota
   const generateTTSWithRetry = async (text: string, lang: 'en' | 'vi', sceneIndex: number): Promise<string | undefined> => {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 4; attempt++) {
       try {
         const blobUrl = await generateSpeech(text, lang);
         // Upload to Supabase so URL is permanent and CORS-safe
@@ -560,13 +567,13 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         } catch (_) {}
         return blobUrl; // fallback: use blob URL
       } catch (err: any) {
-        const msg = (err?.message || '').toLowerCase();
-        const isQuota = msg.includes('quota') || msg.includes('429') || err?.status === 429;
-        if (isQuota && attempt < 2) {
-          // Wait 65s for rate limit window to reset before retrying
-          await new Promise(r => setTimeout(r, 65000));
+        const rawMsg = err?.message || '';
+        const isQuota = rawMsg.toLowerCase().includes('quota') || rawMsg.includes('429') || err?.status === 429;
+        if (isQuota && attempt < 3) {
+          const waitMs = parseRetryDelay(rawMsg);
+          await new Promise(r => setTimeout(r, waitMs));
         } else {
-          console.error(`TTS scene ${sceneIndex + 1} failed:`, err?.message);
+          console.error(`TTS scene ${sceneIndex + 1} failed:`, rawMsg);
           return undefined;
         }
       }

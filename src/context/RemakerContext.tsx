@@ -386,8 +386,11 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const narrationText = scene?.narration || scene?.action || '';
           let audioUrl: string | undefined;
           if (narrationText) {
-            let ttsAttempts = 0;
-            while (ttsAttempts < 3) {
+            const parseRetryDelay = (msg: string) => {
+              const m = msg.match(/retry in ([\d.]+)s/i);
+              return m ? Math.ceil(parseFloat(m[1])) * 1000 + 3000 : 65000;
+            };
+            for (let ttsAttempt = 0; ttsAttempt < 4; ttsAttempt++) {
               try {
                 const blobUrl = await generateSpeech(narrationText, 'en');
                 const audioRes = await fetch(blobUrl);
@@ -407,12 +410,12 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 }
                 break; // success
               } catch (ttsErr: any) {
-                ttsAttempts++;
                 const msg = ttsErr.message || '';
                 const isQuota = msg.toLowerCase().includes('quota') || msg.includes('429');
-                if (isQuota && ttsAttempts < 3) {
-                  addLog(`Scene ${sceneIndexToProcess + 1} TTS quota hit, retrying in 65s...`, 'info');
-                  await new Promise(r => setTimeout(r, 65000));
+                if (isQuota && ttsAttempt < 3) {
+                  const waitMs = parseRetryDelay(msg);
+                  addLog(`Scene ${sceneIndexToProcess + 1} TTS quota hit, retrying in ${Math.round(waitMs / 1000)}s...`, 'info');
+                  await new Promise(r => setTimeout(r, waitMs));
                 } else {
                   addLog(`Scene ${sceneIndexToProcess + 1} TTS failed: ${msg}`, 'error');
                   break;

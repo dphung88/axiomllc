@@ -120,6 +120,11 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        // One-time migration: delete stale characterStyle from old localStorage entries
+        if (parsed.characterStyle !== undefined) {
+          delete parsed.characterStyle;
+          localStorage.setItem('remakerState', JSON.stringify(parsed));
+        }
 
         let hasPendingVideos = false;
         if (parsed.remadeScenes && parsed.remadeScenes.length > 0) {
@@ -145,10 +150,11 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
             parsed.remadeScenes = restoredScenes;
 
             setState(prev => {
-              const { hasApiKey: _ignored, ...parsedWithoutApiKey } = parsed;
+              const { hasApiKey: _ignored, characterStyle: _noChar, ...parsedWithoutApiKey } = parsed;
               const newState = {
                 ...prev,
                 ...parsedWithoutApiKey,
+                characterStyle: '',  // Never restored — must be entered fresh each session
                 isGenerating: hasPendingVideos,
                 isAssembling: false
               };
@@ -165,10 +171,11 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
           restoreUrls();
         } else {
           setState(prev => {
-            const { hasApiKey: _ignored, ...parsedWithoutApiKey } = parsed;
+            const { hasApiKey: _ignored, characterStyle: _noChar, ...parsedWithoutApiKey } = parsed;
             const newState = {
               ...prev,
               ...parsedWithoutApiKey,
+              characterStyle: '',  // Never restored — must be entered fresh each session
               isGenerating: hasPendingVideos,
               isAssembling: false
             };
@@ -204,10 +211,10 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     checkKey();
   }, [customApiKey]);
 
-  // Save to localStorage on change
+  // Save to localStorage on change (exclude characterStyle — must be entered fresh each session)
   useEffect(() => {
     if (isLoaded) {
-      const stateToSave = { ...state };
+      const { characterStyle: _excluded, ...stateToSave } = state;
       localStorage.setItem('remakerState', JSON.stringify(stateToSave));
     }
   }, [state, isLoaded]);

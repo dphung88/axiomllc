@@ -138,6 +138,11 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        // One-time migration: delete stale characterStyle from old localStorage entries
+        if (parsed.characterStyle !== undefined) {
+          delete parsed.characterStyle;
+          localStorage.setItem('autoStoryState', JSON.stringify(parsed));
+        }
         
         // Check if there are pending video generations
         let hasPendingVideos = false;
@@ -154,9 +159,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             isGeneratingScript: false,
             isGeneratingVideos: hasPendingVideos,
             isAssembling: false,
-            // Never restore characterStyle from old session — user must re-enter it each time
-            // to avoid stale character descriptions polluting new workflows
-            characterStyle: hasPendingVideos ? (parsed.characterStyle || '') : '',
+            characterStyle: '',  // Never restored — not saved to localStorage
           };
           stateRef.current = newState;
           return newState;
@@ -176,8 +179,11 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (isLoaded) {
       try {
-        // Deep clone and strip non-serializable properties to prevent circular structure errors
+        // Deep clone and strip non-serializable + sensitive properties
         const cleanState = JSON.parse(JSON.stringify(state, (key, value) => {
+          // Never persist characterStyle — it must be entered fresh each session
+          // to prevent stale character descriptions polluting new workflows
+          if (key === 'characterStyle') return undefined;
           if (value instanceof HTMLElement || (value && value.constructor && value.constructor.name === 'FiberNode')) {
             return undefined;
           }
@@ -186,7 +192,6 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         localStorage.setItem('autoStoryState', JSON.stringify(cleanState));
       } catch (e) {
         console.warn('Failed to save state to localStorage safely:', e);
-        // Fallback: try to save a minimal state if full save fails
         try {
           const minimalState = { idea: state.idea, style: state.style, scriptData: state.scriptData };
           localStorage.setItem('autoStoryState', JSON.stringify(minimalState));

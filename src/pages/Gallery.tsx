@@ -146,13 +146,16 @@ export function Gallery() {
         if (storageErr) console.warn('Storage batch delete warning:', storageErr.message);
       }
 
-      // ── Step 4: delete all DB records ──
+      // ── Step 4: delete all DB records by their actual IDs ──
       setDeleteAllProgress('Clearing database records...');
-      const { error: dbErr } = await supabase
-        .from('studio_gallery')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // delete all rows
-      if (dbErr) throw dbErr;
+      if (allItems && allItems.length > 0) {
+        const ids = allItems.map((i: any) => i.id);
+        const { error: dbErr } = await supabase
+          .from('studio_gallery')
+          .delete()
+          .in('id', ids);
+        if (dbErr) throw dbErr;
+      }
 
       setItems([]);
       setDeleteAllState('idle');

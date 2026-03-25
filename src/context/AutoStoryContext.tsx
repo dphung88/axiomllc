@@ -146,16 +146,23 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // One-time migration: delete stale characterStyle from old localStorage entries
-        if (parsed.characterStyle !== undefined) {
-          delete parsed.characterStyle;
-          localStorage.setItem('autoStoryState', JSON.stringify(parsed));
+        // Migration: remove fields that must never be persisted
+        let needsSave = false;
+        if (parsed.characterStyle !== undefined) { delete parsed.characterStyle; needsSave = true; }
+        // If no pending videos, wipe scriptData/scenesState/finalVideo from storage right now
+        // so the next load starts completely clean (no stale characters/settings)
+        const hasPending = parsed.scenesState?.some((s: any) => s.loading && !s.url && !s.error);
+        if (!hasPending) {
+          if (parsed.scriptData !== undefined) { delete parsed.scriptData; needsSave = true; }
+          if (parsed.scenesState !== undefined) { delete parsed.scenesState; needsSave = true; }
+          if (parsed.finalVideo !== undefined) { delete parsed.finalVideo; needsSave = true; }
         }
+        if (needsSave) localStorage.setItem('autoStoryState', JSON.stringify(parsed));
         
         // Check if there are pending video generations
         let hasPendingVideos = false;
         if (parsed.scenesState) {
-          hasPendingVideos = parsed.scenesState.some((s: SceneState) => 
+          hasPendingVideos = parsed.scenesState.some((s: SceneState) =>
             s.loading && !s.url && !s.error
           );
         }
@@ -167,7 +174,13 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             isGeneratingScript: false,
             isGeneratingVideos: hasPendingVideos,
             isAssembling: false,
-            characterStyle: '',  // Never restored — not saved to localStorage
+            characterStyle: '',   // Never restored — not saved to localStorage
+            // Only restore scriptData + scenesState when a workflow is actively in progress.
+            // If the session was fully completed (no pending videos), start fresh so stale
+            // characters/settings from the old workflow don't bleed into a new one.
+            scriptData: hasPendingVideos ? parsed.scriptData : null,
+            scenesState: hasPendingVideos ? (parsed.scenesState ?? []) : [],
+            finalVideo: hasPendingVideos ? parsed.finalVideo : null,
           };
           stateRef.current = newState;
           return newState;

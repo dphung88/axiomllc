@@ -59,6 +59,8 @@ export function AutoStoryGen() {
     switchVariant,
     startVideoGeneration,
     updateScenePrompt,
+    updateCharacter,
+    updateSetting,
   } = useAutoStory();
 
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -499,8 +501,9 @@ export function AutoStoryGen() {
 
               {scriptData && activeTab === 'script' && (
                 <div className="space-y-8 animate-in fade-in duration-300">
-                  <div className="mb-2">
+                  <div className="flex items-center justify-between mb-2">
                     <h3 className="text-lg font-bold text-white">Neural Storyboard</h3>
+                    <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-widest">Click fields to edit</span>
                   </div>
                   <div className="space-y-8">
                     <div>
@@ -509,9 +512,19 @@ export function AutoStoryGen() {
                       </h4>
                       <div className="grid grid-cols-1 gap-3">
                         {scriptData.characters.map((char, i) => (
-                          <div key={i} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800">
-                            <span className="font-bold text-cyan-300 block mb-1">{char.name}</span>
-                            <span className="text-sm text-zinc-400">{char.description}</span>
+                          <div key={i} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 space-y-2">
+                            <input
+                              defaultValue={char.name}
+                              onBlur={(e) => updateCharacter(i, e.target.value, char.description)}
+                              className="font-bold text-cyan-300 block w-full bg-transparent border-b border-zinc-700 focus:border-cyan-500 outline-none pb-1 text-sm"
+                              placeholder="Character name"
+                            />
+                            <textarea
+                              defaultValue={char.description}
+                              onBlur={(e) => updateCharacter(i, char.name, e.target.value)}
+                              className="text-sm text-zinc-400 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 resize-none h-20 focus:border-cyan-500/50 outline-none"
+                              placeholder="Character description..."
+                            />
                           </div>
                         ))}
                       </div>
@@ -522,9 +535,19 @@ export function AutoStoryGen() {
                       </h4>
                       <div className="grid grid-cols-1 gap-3">
                         {scriptData.settings.map((setting, i) => (
-                          <div key={i} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800">
-                            <span className="font-bold text-cyan-300 block mb-1">{setting.name}</span>
-                            <span className="text-sm text-zinc-400">{setting.description}</span>
+                          <div key={i} className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 space-y-2">
+                            <input
+                              defaultValue={setting.name}
+                              onBlur={(e) => updateSetting(i, e.target.value, setting.description)}
+                              className="font-bold text-cyan-300 block w-full bg-transparent border-b border-zinc-700 focus:border-cyan-500 outline-none pb-1 text-sm"
+                              placeholder="Setting name"
+                            />
+                            <textarea
+                              defaultValue={setting.description}
+                              onBlur={(e) => updateSetting(i, setting.name, e.target.value)}
+                              className="text-sm text-zinc-400 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 resize-none h-20 focus:border-cyan-500/50 outline-none"
+                              placeholder="Setting description..."
+                            />
                           </div>
                         ))}
                       </div>

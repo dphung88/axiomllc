@@ -107,6 +107,8 @@ interface AutoStoryContextType extends AutoStoryState {
   switchVariant: (index: number, variant: 1 | 2) => void;
   startVideoGeneration: () => void;
   updateScenePrompt: (index: number, prompt: string, narration?: string) => void;
+  updateCharacter: (index: number, name: string, description: string) => void;
+  updateSetting: (index: number, name: string, description: string) => void;
 }
 
 const AutoStoryContext = createContext<AutoStoryContextType | undefined>(undefined);
@@ -881,6 +883,28 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   };
 
+  const updateCharacter = (index: number, name: string, description: string) => {
+    setState(prev => {
+      if (!prev.scriptData) return prev;
+      const newChars = [...prev.scriptData.characters];
+      newChars[index] = { name, description };
+      const newState = { ...prev, scriptData: { ...prev.scriptData, characters: newChars } };
+      stateRef.current = newState;
+      return newState;
+    });
+  };
+
+  const updateSetting = (index: number, name: string, description: string) => {
+    setState(prev => {
+      if (!prev.scriptData) return prev;
+      const newSettings = [...prev.scriptData.settings];
+      newSettings[index] = { name, description };
+      const newState = { ...prev, scriptData: { ...prev.scriptData, settings: newSettings } };
+      stateRef.current = newState;
+      return newState;
+    });
+  };
+
   return (
     <AutoStoryContext.Provider value={{
       ...state,
@@ -908,6 +932,8 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       switchVariant,
       startVideoGeneration,
       updateScenePrompt,
+      updateCharacter,
+      updateSetting,
     }}>
       {children}
     </AutoStoryContext.Provider>

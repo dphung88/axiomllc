@@ -84,6 +84,13 @@ export function Gallery() {
     }
   };
 
+  // Supabase anon key for Edge Function Authorization header
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string || '';
+  const edgeFetchHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${supabaseAnonKey}`,
+  };
+
   // Delete one item — storage path via Edge Function, DB via client
   const handleDelete = async (item: GalleryItem) => {
     if (!window.confirm('Delete this item from archives?')) return;
@@ -95,7 +102,7 @@ export function Gallery() {
         const edgeUrl = getSupabaseEdgeUrl();
         await fetch(`${edgeUrl}/storage-purge`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: edgeFetchHeaders,
           body: JSON.stringify({ paths: [storagePath] }),
         }).catch(e => console.warn('Storage delete via edge failed:', e));
       }
@@ -121,7 +128,7 @@ export function Gallery() {
 
       const res = await fetch(`${edgeUrl}/storage-purge`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: edgeFetchHeaders,
       });
       const result = await res.json();
 

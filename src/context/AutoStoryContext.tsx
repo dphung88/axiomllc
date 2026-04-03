@@ -49,6 +49,7 @@ export interface AutoStoryState {
   workflowError: string | null;
   hasApiKey: boolean;
   characterStyle: string;
+  characterRefImage: { data: string; mimeType: string; url: string } | null;
   isRegeneratingPrompts: boolean;
 }
 
@@ -73,6 +74,7 @@ const initialState: AutoStoryState = {
   workflowError: null,
   hasApiKey: false,
   characterStyle: '',
+  characterRefImage: null,
   isRegeneratingPrompts: false,
 };
 
@@ -97,6 +99,7 @@ interface AutoStoryContextType extends AutoStoryState {
   checkApiKey: () => Promise<boolean>;
   openDirectoryPicker: () => Promise<void>;
   setCharacterStyle: (style: string) => void;
+  setCharacterRefImage: (img: { data: string; mimeType: string; url: string } | null) => void;
   repromptScene: (index: number, customPrompt: string) => void;
   generateAltVariant: (index: number) => Promise<void>;
   generateNewAlt: (index: number) => Promise<void>;
@@ -158,7 +161,8 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             isGeneratingScript: false,
             isGeneratingVideos: hasPendingVideos,
             isAssembling: false,
-            characterStyle: '',  // Never restored — must be entered fresh each session
+            characterStyle: '',        // Never restored — must be entered fresh each session
+            characterRefImage: null,   // Never restored — too large for localStorage
             // Always restore scenes/script/video — user should see their work after F5.
             // Only reset() explicitly clears these.
             scriptData: parsed.scriptData ?? null,
@@ -185,9 +189,9 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       try {
         // Deep clone and strip non-serializable + sensitive properties
         const cleanState = JSON.parse(JSON.stringify(state, (key, value) => {
-          // Never persist characterStyle — it must be entered fresh each session
-          // to prevent stale character descriptions polluting new workflows
+          // Never persist characterStyle or characterRefImage — too large / must be entered fresh
           if (key === 'characterStyle') return undefined;
+          if (key === 'characterRefImage') return undefined;
           if (value instanceof HTMLElement || (value && value.constructor && value.constructor.name === 'FiberNode')) {
             return undefined;
           }
@@ -272,6 +276,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     prompt: string,
     aspectRatio: AspectRatio,
     model: string,
+    image?: { data: string; mimeType: string },
     lastFrame?: { data: string; mimeType: string },
     maxRetries = 5
   ) => {
@@ -280,7 +285,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     while (attempt <= maxRetries) {
       try {
-        const operation = await generateVideo(prompt, undefined, lastFrame, aspectRatio, '720p', model);
+        const operation = await generateVideo(prompt, image, lastFrame, aspectRatio, '720p', model);
         const url = await pollVideoOperation(operation);
         return url;
       } catch (error: any) {
@@ -330,7 +335,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           break;
         }
 
-        const { scriptData, aspectRatio, veoModel } = currentState;
+        const { scriptData, aspectRatio, veoModel, characterRefImage } = currentState;
         if (!scriptData) break;
 
         const scene = scriptData.scenes[sceneIndexToProcess];
@@ -347,6 +352,8 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           ? ` Voiceover narration: "${scene.narration}"`
           : '';
         const fullPrompt = characterLock + characterPrefix + (sceneCustomPrompt || scene.prompt) + narrationSuffix;
+        // Character reference image: strip url field before passing to API
+        const imageForApi = characterRefImage ? { data: characterRefImage.data, mimeType: characterRefImage.mimeType } : undefined;
 
         // Mark as processing
         setState(prev => {
@@ -360,8 +367,8 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
 
         try {
-          // Pass last frame of previous scene so Veo maintains character consistency
-          const url = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel, previousSceneLastFrame);
+          // Pass character ref image (if any), then last frame for scene continuity
+          const url = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel, imageForApi, previousSceneLastFrame);
           if (myGenerationId !== currentGenerationId) break;
 
           // Extract last frame of this scene to use as reference for next scene (await so it's ready)
@@ -676,7 +683,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       openKeySelection();
       return;
     }
-    const { scriptData, aspectRatio, veoModel, characterStyle } = stateRef.current;
+    const { scriptData, aspectRatio, veoModel, characterStyle, characterRefImage } = stateRef.current;
     if (!scriptData) return;
 
     const scene = scriptData.scenes[sceneIndex];
@@ -703,8 +710,9 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         ? ` Voiceover narration: "${scene.narration}"`
         : '';
       const fullPrompt = characterLock + characterPrefix + (sceneState.customPrompt || scene.prompt) + narrationSuffix;
+      const imageForApi = characterRefImage ? { data: characterRefImage.data, mimeType: characterRefImage.mimeType } : undefined;
 
-      const newUrl = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel);
+      const newUrl = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel, imageForApi);
 
       const savedNewUrl = await saveToStudioGallery({
         type: 'video', url: newUrl,
@@ -745,7 +753,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       openKeySelection();
       return;
     }
-    const { scriptData, aspectRatio, veoModel, characterStyle } = stateRef.current;
+    const { scriptData, aspectRatio, veoModel, characterStyle, characterRefImage } = stateRef.current;
     if (!scriptData) return;
 
     const scene = scriptData.scenes[sceneIndex];
@@ -772,8 +780,9 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         ? ` Voiceover narration: "${scene.narration}"`
         : '';
       const fullPrompt = characterLock + characterPrefix + (sceneState.customPrompt || scene.prompt) + narrationSuffix;
+      const imageForApi = characterRefImage ? { data: characterRefImage.data, mimeType: characterRefImage.mimeType } : undefined;
 
-      const newUrl = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel);
+      const newUrl = await generateSceneWithRetry(fullPrompt, aspectRatio, veoModel, imageForApi);
 
       const savedNewUrl = await saveToStudioGallery({
         type: 'video', url: newUrl,
@@ -880,6 +889,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       checkApiKey,
       openDirectoryPicker,
       setCharacterStyle: (style) => updateState({ characterStyle: style }),
+      setCharacterRefImage: (img) => updateState({ characterRefImage: img }),
       repromptScene,
       generateAltVariant,
       generateNewAlt,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, Play, Users, Image as ImageIcon, Video, FileText, CheckCircle2, Film, Download, AlertCircle, ArrowUpCircle, Upload, Type, Volume2, Wand2, RotateCcw, Plus, Terminal, FolderOpen, Key, RefreshCw, X, Sparkles } from 'lucide-react';
+import { Loader2, Play, Users, Image as ImageIcon, Video, FileText, CheckCircle2, Film, Download, AlertCircle, ArrowUpCircle, Upload, Type, Volume2, Wand2, RotateCcw, Plus, Terminal, FolderOpen, Key, RefreshCw, X, Sparkles, UserCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAutoStory } from '../context/AutoStoryContext';
 import { useSettings } from '../context/SettingsContext';
@@ -51,6 +51,8 @@ export function AutoStoryGen() {
     openDirectoryPicker,
     characterStyle,
     setCharacterStyle,
+    characterRefImage,
+    setCharacterRefImage,
     repromptScene,
     generateAltVariant,
     generateNewAlt,
@@ -404,6 +406,60 @@ export function AutoStoryGen() {
                   placeholder="Describe consistent character appearance across all scenes, e.g.: Professor Pixel is a cartoon owl with large round glasses, brown vest, holding a blue book. Always maintain this exact look."
                   className={`w-full bg-zinc-950 border rounded-xl p-3 text-cyan-500 font-sans h-20 resize-none text-xs focus:ring-1 outline-none transition-all ${characterStyle ? 'border-amber-500/40 focus:border-amber-500/60 focus:ring-amber-500/30' : 'border-zinc-800 focus:border-cyan-500/50 focus:ring-cyan-500/50'}`}
                 />
+              </div>
+
+              {/* Character Reference Image */}
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-2 ml-1">
+                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                    <UserCircle2 className="w-3 h-3 text-cyan-500/70" /> Character Reference Image (Optional)
+                  </label>
+                  {characterRefImage && (
+                    <button
+                      onClick={() => setCharacterRefImage(null)}
+                      className="flex items-center gap-1 text-[9px] font-bold text-red-400 hover:text-red-300 uppercase tracking-wider border border-red-500/30 hover:border-red-400/50 rounded px-2 py-0.5 transition-all"
+                    >
+                      <X className="w-2.5 h-2.5" /> Remove
+                    </button>
+                  )}
+                </div>
+                {characterRefImage && (
+                  <div className="mb-2 px-2 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-2">
+                    <AlertCircle className="w-3 h-3 text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-[10px] text-amber-300">Image reference active — passed to ALL scene generations. Remove if starting a new story.</p>
+                  </div>
+                )}
+                <div className="relative flex items-center gap-4">
+                  {/* Upload area */}
+                  <label className="relative flex-shrink-0 w-20 h-20 rounded-xl border-2 border-dashed border-zinc-700 hover:border-cyan-500 bg-zinc-950 cursor-pointer overflow-hidden group transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          const dataUrl = ev.target?.result as string;
+                          setCharacterRefImage({ data: dataUrl.split(',')[1], mimeType: file.type, url: dataUrl });
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                    {characterRefImage ? (
+                      <img src={characterRefImage.url} className="w-full h-full object-cover" alt="Character ref" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-full gap-1 text-zinc-600 group-hover:text-zinc-400 transition-colors">
+                        <UserCircle2 className="w-6 h-6" />
+                        <span className="text-[8px] font-black uppercase tracking-widest">Upload</span>
+                      </div>
+                    )}
+                  </label>
+                  <p className="text-[10px] text-zinc-500 leading-relaxed">
+                    Upload a character photo or illustration. It will be sent as a visual reference to Veo for every scene to maintain consistent appearance.
+                  </p>
+                </div>
               </div>
 
               <button

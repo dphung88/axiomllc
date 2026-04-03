@@ -336,7 +336,7 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // Use custom prompt if set by user (re-prompt feature), otherwise build from scene data
         const customPrompt = remadeScenes[sceneIndexToProcess]?.customPrompt;
         const narrationSuffix = !customPrompt && scene.narration
-          ? ` Voiceover narration: "${scene.narration}".`
+          ? ` An off-screen narrator speaks this line as audio: "${scene.narration}" — no text, captions, or subtitles should appear on screen.`
           : '';
         let prompt = customPrompt
           ? `${charPrefix}${customPrompt}`

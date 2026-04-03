@@ -347,9 +347,9 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const characterLock = currentState.characterStyle ? `Character style lock: ${currentState.characterStyle}. ` : '';
         // Use scene's customPrompt if set (from reprompt), otherwise use original
         const sceneCustomPrompt = currentState.scenesState[sceneIndexToProcess]?.customPrompt;
-        // Append narration so Veo generates voiceover audio embedded in the video
+        // Append narration as spoken audio instruction — explicitly no text overlay on screen
         const narrationSuffix = !sceneCustomPrompt && scene.narration
-          ? ` Voiceover narration: "${scene.narration}"`
+          ? ` An off-screen narrator speaks this line as audio: "${scene.narration}" — no text, captions, or subtitles should appear on screen.`
           : '';
         const fullPrompt = characterLock + characterPrefix + (sceneCustomPrompt || scene.prompt) + narrationSuffix;
         // Character reference image: strip url field before passing to API
@@ -534,7 +534,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const characterLock = characterStyle ? `Character style lock: ${characterStyle}. ` : '';
     const sceneCustomPrompt = sceneState?.customPrompt;
     const narrationSuffix = !sceneCustomPrompt && scene.narration
-      ? ` Voiceover narration: "${scene.narration}"`
+      ? ` An off-screen narrator speaks this line as audio: "${scene.narration}" — no text, captions, or subtitles should appear on screen.`
       : '';
     const fullPrompt = characterLock + characterPrefix + (sceneCustomPrompt || scene.prompt) + narrationSuffix;
     const imageForApi = characterRefImage ? { data: characterRefImage.data, mimeType: characterRefImage.mimeType } : undefined;
@@ -725,7 +725,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         : '';
       const characterLock = characterStyle ? `Character style lock: ${characterStyle}. ` : '';
       const narrationSuffix = !sceneState.customPrompt && scene.narration
-        ? ` Voiceover narration: "${scene.narration}"`
+        ? ` An off-screen narrator speaks this line as audio: "${scene.narration}" — no text, captions, or subtitles should appear on screen.`
         : '';
       const fullPrompt = characterLock + characterPrefix + (sceneState.customPrompt || scene.prompt) + narrationSuffix;
       const imageForApi = characterRefImage ? { data: characterRefImage.data, mimeType: characterRefImage.mimeType } : undefined;
@@ -795,7 +795,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         : '';
       const characterLock = characterStyle ? `Character style lock: ${characterStyle}. ` : '';
       const narrationSuffix = !sceneState.customPrompt && scene.narration
-        ? ` Voiceover narration: "${scene.narration}"`
+        ? ` An off-screen narrator speaks this line as audio: "${scene.narration}" — no text, captions, or subtitles should appear on screen.`
         : '';
       const fullPrompt = characterLock + characterPrefix + (sceneState.customPrompt || scene.prompt) + narrationSuffix;
       const imageForApi = characterRefImage ? { data: characterRefImage.data, mimeType: characterRefImage.mimeType } : undefined;

@@ -139,7 +139,9 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 if (s.status === 'done') {
                   const freshUrl = await getVideoBlob(`scene-${i}`);
                   if (freshUrl) return { ...s, url: freshUrl };
-                  // Blob gone — mark for retry
+                  // Blob gone — fall back to Supabase savedUrl if available
+                  if (s.savedUrl) return { ...s, url: s.savedUrl };
+                  // No fallback — mark for retry
                   return { ...s, url: '', status: 'error', error: 'Session expired. Please retry.' };
                 }
                 return s;

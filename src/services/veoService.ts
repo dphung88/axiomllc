@@ -9,17 +9,30 @@ export const getAiClient = () => {
 
 // ─── Vertex AI mode (routes through Supabase Edge Functions → GCP billing → $300 credit) ───
 
+/**
+ * Vertex AI publisher model IDs differ from Gemini Developer API names.
+ * Map UI-facing model names → the correct Vertex AI model identifier
+ * so the edge function receives a name that Vertex AI actually recognises.
+ */
+const VERTEX_MODEL_MAP: Record<string, string> = {
+  'veo-3.1-fast-generate-preview': 'veo-2.0-generate-001', // no fast/3.1 variant on Vertex
+  'veo-3-generate-preview':        'veo-2.0-generate-001', // Veo 3 not yet GA on Vertex
+  'veo-3.0-generate-preview':      'veo-2.0-generate-001',
+  'veo-2.0-generate-001':          'veo-2.0-generate-001',
+};
+
 const vertexStart = async (
   prompt: string,
   image?: { data: string; mimeType: string },
   aspectRatio = '16:9',
   model = 'veo-2.0-generate-001',
 ): Promise<string> => {
+  const vertexModel = VERTEX_MODEL_MAP[model] ?? 'veo-2.0-generate-001';
   const edgeUrl = getSupabaseEdgeUrl();
   const res = await fetch(`${edgeUrl}/veo-start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, image, aspectRatio, model }),
+    body: JSON.stringify({ prompt, image, aspectRatio, model: vertexModel }),
   });
   const data = await res.json();
   if (data.error) throw new Error(`Vertex AI (veo-start): ${data.error}`);
@@ -32,6 +45,7 @@ const vertexPoll = async (
   onProgress?: (msg: string) => void,
   model = 'veo-2.0-generate-001',
 ): Promise<string> => {
+  const vertexModel = VERTEX_MODEL_MAP[model] ?? 'veo-2.0-generate-001';
   const edgeUrl = getSupabaseEdgeUrl();
   const startTime = Date.now();
   const timeoutMs = 12 * 60 * 1000; // 12 minutes
@@ -47,7 +61,7 @@ const vertexPoll = async (
     const res = await fetch(`${edgeUrl}/veo-poll`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ operationName, model }),
+      body: JSON.stringify({ operationName, model: vertexModel }),
     });
 
     const data = await res.json();

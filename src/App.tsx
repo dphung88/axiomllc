@@ -73,8 +73,8 @@ function Sidebar() {
               to={link.path}
               onClick={(e) => handleNavClick(e, link.path)}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                active 
-                  ? 'bg-cyan-500/10 text-cyan-500 font-black uppercase tracking-wider text-xs' 
+                active
+                  ? 'bg-cyan-500/10 text-cyan-500 font-black uppercase tracking-wider text-xs'
                   : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200 font-black uppercase tracking-wider text-xs'
               }`}
             >
@@ -109,6 +109,17 @@ function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Version badge */}
+      <div className="px-6 py-4 border-t border-zinc-800/60">
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">Version</span>
+          <span className="text-[9px] font-black text-cyan-600 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full tracking-widest">
+            v1.0.0
+          </span>
+        </div>
+        <p className="text-[8px] text-zinc-700 mt-1 tracking-wide">Powered by Veo 3.1 · Gemini 2.5</p>
+      </div>
     </div>
   );
 }

@@ -522,10 +522,23 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       openKeySelection();
       return;
     }
-    const { scriptData, aspectRatio } = state;
+    const { scriptData, aspectRatio, veoModel, characterStyle, characterRefImage } = stateRef.current;
     if (!scriptData) return;
     const scene = scriptData.scenes[sceneIndex];
-    
+    const sceneState = stateRef.current.scenesState[sceneIndex];
+
+    // Build the same full prompt used during generation (with character lock + narration)
+    const characterPrefix = scriptData.characters && scriptData.characters.length > 0
+      ? scriptData.characters.map(c => `${c.name}: ${c.description}`).join('. ') + '. Maintain consistent character appearance throughout. '
+      : '';
+    const characterLock = characterStyle ? `Character style lock: ${characterStyle}. ` : '';
+    const sceneCustomPrompt = sceneState?.customPrompt;
+    const narrationSuffix = !sceneCustomPrompt && scene.narration
+      ? ` Voiceover narration: "${scene.narration}"`
+      : '';
+    const fullPrompt = characterLock + characterPrefix + (sceneCustomPrompt || scene.prompt) + narrationSuffix;
+    const imageForApi = characterRefImage ? { data: characterRefImage.data, mimeType: characterRefImage.mimeType } : undefined;
+
     setState(prev => {
       const newScenes = [...prev.scenesState];
       newScenes[sceneIndex] = { ...newScenes[sceneIndex], isUpscaling: true };
@@ -533,7 +546,7 @@ export const AutoStoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     try {
-      const operation = await generateVideo(scene.prompt, undefined, undefined, aspectRatio, '1080p');
+      const operation = await generateVideo(fullPrompt, imageForApi, undefined, aspectRatio, '1080p', veoModel);
       const url = await pollVideoOperation(operation);
       
       setState(prev => {

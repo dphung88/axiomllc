@@ -43,7 +43,8 @@ export function StyleRemaker() {
     logs,
     startGeneration, reGenerateAll, retryVariant, assembleFinalVideo, reset, showToast,
     openKeySelection, repromptScene, repromptSceneWithPrompt, addLog,
-    characterStyle, setCharacterStyle
+    characterStyle, setCharacterStyle,
+    language, setLanguage,
   } = useRemaker();
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -108,7 +109,7 @@ export function StyleRemaker() {
       addLog(`Successfully extracted ${frames.length} frames.`, 'success');
       
       addLog('Sending visual data to Gemini 2.0 Flash...', 'info');
-      const extractedScenes = await analyzeVideoScenes(frames, targetSceneCount);
+      const extractedScenes = await analyzeVideoScenes(frames, targetSceneCount, language);
       
       if (!extractedScenes || !Array.isArray(extractedScenes) || extractedScenes.length === 0) {
         throw new Error("AI returned an invalid or empty scene list.");
@@ -122,7 +123,8 @@ export function StyleRemaker() {
         action: s.action || "No action described",
         characters: s.characters || "None",
         setting: s.setting || "Default environment",
-        mood: s.mood || "Neutral"
+        mood: s.mood || "Neutral",
+        narration: s.narration || ""
       }));
 
       addLog(`Validation successful. Decomposed into ${validatedScenes.length} scenes.`, 'success');
@@ -182,8 +184,9 @@ export function StyleRemaker() {
       const ai = new GoogleGenAI({ apiKey });
       
       const prompt = `Analyze this video. Break it down into exactly ${targetSceneCount} distinct scenes.
-      Return ONLY a JSON array of ${targetSceneCount} objects. 
-      Format: [{"sceneNumber": 1, "action": "...", "characters": "...", "setting": "...", "mood": "..."}, ...]`;
+      For each scene include: action, characters, setting, mood, and a short narration voiceover line (1-2 sentences in English).
+      Return ONLY a JSON array of ${targetSceneCount} objects.
+      Format: [{"sceneNumber": 1, "action": "...", "characters": "...", "setting": "...", "mood": "...", "narration": "..."}, ...]`;
 
       const result = await ai.models.generateContent({
         model: model,
@@ -202,7 +205,15 @@ export function StyleRemaker() {
         return jsonMatch ? jsonMatch[0] : text;
       };
 
-      const validatedScenes = JSON.parse(cleanJson(jsonResult));
+      const rawScenes = JSON.parse(cleanJson(jsonResult));
+      const validatedScenes = Array.isArray(rawScenes) ? rawScenes.map((s: any, idx: number) => ({
+        sceneNumber: s.sceneNumber || idx + 1,
+        action: s.action || "No action described",
+        characters: s.characters || "None",
+        setting: s.setting || "Default environment",
+        mood: s.mood || "Neutral",
+        narration: s.narration || ""
+      })) : rawScenes;
       setScenes(validatedScenes);
       setStep(3);
       addLog('Direct analysis successful!', 'success');
@@ -482,6 +493,19 @@ export function StyleRemaker() {
                         placeholder="e.g. Young woman, red hair, blue jacket — applied to all scenes"
                         className="w-full bg-zinc-900/60 border border-zinc-700 rounded-xl px-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500/50"
                       />
+                    </div>
+                    {/* Voiceover language */}
+                    <div className="mb-6">
+                      <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2 block">Voiceover Language</label>
+                      <select
+                        value={language}
+                        onChange={e => setLanguage(e.target.value as any)}
+                        className="w-full bg-zinc-900/60 border border-zinc-700 rounded-xl px-4 py-2.5 text-xs text-cyan-400 focus:outline-none focus:border-cyan-500/50 appearance-none"
+                      >
+                        <option value="en">English (en-US)</option>
+                        <option value="vi">Vietnamese (vi-VN)</option>
+                        <option value="none">No Voiceover</option>
+                      </select>
                     </div>
                     <div className="flex justify-end">
                       <button

@@ -194,29 +194,36 @@ export const extractFrames = async (videoFile: File, numFrames: number = 5): Pro
   });
 };
 
-export const analyzeVideoScenes = async (framesBase64: string[], targetSceneCount: number = 5) => {
+export const analyzeVideoScenes = async (framesBase64: string[], targetSceneCount: number = 5, language: 'en' | 'vi' | 'none' = 'en') => {
   const apiKey = getApiKey();
   const model = getLlmModel();
   if (!apiKey) throw new Error('API Key is missing. Please select or enter an API key in Settings.');
-  
+
   const ai = new GoogleGenAI({ apiKey });
-  
+
   const imageParts = framesBase64.map(f => ({
     inlineData: {
       mimeType: 'image/jpeg',
       data: f
     }
   }));
-  
+
+  const langInstruction = language === 'vi'
+    ? 'Write the narration in Vietnamese.'
+    : language === 'none'
+    ? 'Leave the narration field as an empty string "".'
+    : 'Write the narration in English.';
+
   const prompt = `Analyze these sequential frames from a video. Break the video down into exactly ${targetSceneCount} distinct scenes.
 For each scene, describe:
 - action: exactly what is happening
 - characters: who is on screen
 - setting: the environment
 - mood: the visual tone
+- narration: a short voiceover line spoken by a narrator for this scene (1-2 sentences). ${langInstruction}
 
-Return ONLY a JSON array of ${targetSceneCount} objects. 
-Format: [{"sceneNumber": 1, "action": "...", "characters": "...", "setting": "...", "mood": "..."}, ...]`;
+Return ONLY a JSON array of ${targetSceneCount} objects.
+Format: [{"sceneNumber": 1, "action": "...", "characters": "...", "setting": "...", "mood": "...", "narration": "..."}, ...]`;
 
   try {
     const response = await ai.models.generateContent({

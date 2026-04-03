@@ -33,6 +33,7 @@ export interface RemakerState {
   selectedStyle: string;
   customStyle: string;
   characterStyle: string;  // character consistency description
+  language: 'en' | 'vi' | 'none';
   aspectRatio: AspectRatio;
   veoModel: string;
   isGenerating: boolean;
@@ -54,6 +55,7 @@ const initialState: RemakerState = {
   selectedStyle: 'Anime',
   customStyle: '',
   characterStyle: '',
+  language: 'en',
   aspectRatio: '16:9',
   veoModel: 'veo-3.1-fast-generate-preview',
   isGenerating: false,
@@ -79,6 +81,7 @@ interface RemakerContextType extends RemakerState {
   setScenes: (scenes: any[]) => void;
   setSelectedStyle: (style: string) => void;
   setCustomStyle: (style: string) => void;
+  setLanguage: (lang: 'en' | 'vi' | 'none') => void;
   setAspectRatio: (ratio: AspectRatio) => void;
   setVeoModel: (model: string) => void;
   setCharacterStyle: (style: string) => void;
@@ -707,6 +710,7 @@ export const RemakerProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setScenes: (scenes) => updateState({ scenes }),
       setSelectedStyle: (selectedStyle) => updateState({ selectedStyle }),
       setCustomStyle: (customStyle) => updateState({ customStyle }),
+      setLanguage: (language) => updateState({ language }),
       setAspectRatio: (aspectRatio) => updateState({ aspectRatio }),
       setVeoModel: (veoModel) => updateState({ veoModel }),
       startGeneration,

@@ -553,189 +553,167 @@ export function StyleRemaker() {
 
             {step === 4 && (
               <div className="space-y-8">
-                {/* Top row: Preview + Scene Status */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Preview */}
-                  <div className="space-y-4">
-                    <h3 className="text-xl font-black text-white uppercase tracking-tight">Preview Results</h3>
-                    <div className="aspect-video bg-black rounded-[2rem] overflow-hidden border border-zinc-800">
-                      {finalVideo ? (
-                        <video src={finalVideo} controls autoPlay loop className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-zinc-700">
-                          <Loader2 className="w-10 h-10 animate-spin mb-4" />
-                          <span className="text-[10px] font-black uppercase tracking-widest">Assembling Master...</span>
-                        </div>
-                      )}
+                {/* Progress header */}
+                {remadeScenes.length > 0 && (
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full transition-all duration-700"
+                        style={{ width: `${(remadeScenes.filter(s => s.status === 'done').length / remadeScenes.length) * 100}%` }}
+                      />
                     </div>
+                    <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest shrink-0">
+                      {remadeScenes.filter(s => s.status === 'done').length} / {remadeScenes.length} scenes
+                    </span>
                   </div>
+                )}
 
-                  {/* Scene Status */}
-                  <div className="bg-black/20 p-8 rounded-[2rem] border border-zinc-800/50">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-xl font-black text-white uppercase tracking-tight">System Status</h3>
-                      {remadeScenes.length > 0 && (
-                        <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                          {remadeScenes.filter(s => s.status === 'done').length}
-                          <span className="text-zinc-600"> / {remadeScenes.length}</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Progress bar */}
-                    {remadeScenes.length > 0 && (
-                      <div className="mb-5">
-                        <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full transition-all duration-700"
-                            style={{ width: `${(remadeScenes.filter(s => s.status === 'done').length / remadeScenes.length) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-3 overflow-y-auto max-h-[260px] hide-scrollbar pr-1">
-                      {remadeScenes.map((s, i) => {
-                        const isProcessing = s.status === 'processing';
-                        const isQueued    = s.status === 'queued';
-                        return (
-                          <div
-                            key={i}
-                            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                              isProcessing
-                                ? 'bg-cyan-950/30 border-cyan-500/40'
-                                : s.status === 'done'
-                                  ? 'bg-emerald-950/20 border-emerald-500/20'
-                                  : s.status === 'error'
-                                    ? 'bg-red-950/20 border-red-500/20'
-                                    : 'bg-zinc-900/50 border-zinc-800'
-                            }`}
-                          >
-                            {/* Left: scene label + status badge */}
-                            <div className="flex items-center gap-3">
-                              <span className={`text-[10px] font-black uppercase ${isProcessing ? 'text-cyan-400' : 'text-zinc-500'}`}>
-                                Scene {i + 1}
+                {/* Scene video grid — shows results as they come in (like Auto Story) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {remadeScenes.map((s, i) => {
+                    const isProcessing = s.status === 'processing';
+                    const isQueued = s.status === 'queued';
+                    const isDone = s.status === 'done';
+                    const isError = s.status === 'error';
+                    return (
+                      <div key={i} className={`bg-zinc-900/60 border rounded-2xl overflow-hidden flex flex-col transition-all ${
+                        isProcessing ? 'border-cyan-500/40' : isDone ? 'border-zinc-700/60' : isError ? 'border-red-500/30' : 'border-zinc-800'
+                      }`}>
+                        {/* Video / placeholder */}
+                        <div className="relative aspect-video bg-black">
+                          {isDone && s.url ? (
+                            <video src={s.url} controls className="w-full h-full object-cover" />
+                          ) : isError ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-red-400">
+                              <AlertCircle className="w-7 h-7" />
+                              <span className="text-[9px] font-black uppercase tracking-widest">Failed</span>
+                              {s.error && <span className="text-[8px] text-red-500/70 px-3 text-center line-clamp-2">{s.error}</span>}
+                            </div>
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-zinc-600">
+                              <Loader2 className={`w-7 h-7 ${isProcessing ? 'animate-spin text-cyan-500' : ''}`} />
+                              <span className="text-[9px] font-black uppercase tracking-widest">
+                                {isProcessing ? 'Generating...' : 'Queued'}
                               </span>
-                              {isProcessing && (
-                                <span className="text-[8px] font-black text-cyan-500 uppercase tracking-widest bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 animate-pulse">
-                                  Generating
-                                </span>
-                              )}
-                              {isQueued && (
-                                <span className="text-[8px] font-black text-zinc-600 uppercase tracking-widest bg-zinc-800/50 px-2 py-0.5 rounded-full">
-                                  Queued
-                                </span>
+                              {isProcessing && s.startTime && (
+                                <span className="text-[8px] text-cyan-500/70"><ElapsedTime startTime={s.startTime} /></span>
                               )}
                             </div>
-
-                            {/* Right: timer / icon */}
-                            <div className="flex items-center gap-2">
-                              {isProcessing && s.startTime && <ElapsedTime startTime={s.startTime} />}
-                              {s.status === 'done' ? (
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    onClick={() => setRepromptModal({ open: true, index: i, text: s.customPrompt || '' })}
-                                    className="flex items-center gap-1 text-[9px] font-black text-amber-400 hover:text-amber-200 uppercase tracking-wider border border-amber-500/30 hover:border-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-lg transition-all cursor-pointer"
-                                    title="Re-prompt this scene"
-                                  >
-                                    <RefreshCw className="w-2.5 h-2.5" /> Re-prompt
-                                  </button>
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                </div>
-                              ) : s.status === 'error' ? (
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    onClick={() => setRepromptModal({ open: true, index: i, text: s.customPrompt || '' })}
-                                    className="flex items-center gap-1 text-[9px] font-black text-amber-400 hover:text-amber-200 uppercase tracking-wider border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded-lg cursor-pointer"
-                                  >
-                                    <RefreshCw className="w-2.5 h-2.5" /> Re-prompt
-                                  </button>
-                                  <AlertCircle className="w-4 h-4 text-red-500" />
-                                  <button
-                                    onClick={() => retryVariant(i)}
-                                    className="flex items-center gap-1.5 text-[10px] font-black text-red-400 hover:text-red-200 uppercase tracking-wider border border-red-500/40 bg-red-500/10 px-3 py-1 rounded-lg transition-all cursor-pointer"
-                                  >
-                                    <RefreshCw className="w-3 h-3" /> Retry
-                                  </button>
-                                </div>
-                              ) : isProcessing ? (
-                                <Loader2 className="w-4 h-4 text-cyan-500 animate-spin" />
-                              ) : (
-                                <div className="w-4 h-4 rounded-full border border-zinc-700 flex items-center justify-center">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
-                                </div>
-                              )}
-                            </div>
+                          )}
+                          {/* Scene number badge */}
+                          <div className="absolute top-2 left-2 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded-md">
+                            <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest">Scene {i + 1}</span>
                           </div>
-                        );
-                      })}
-                    </div>
+                        </div>
 
-                    {/* Action buttons */}
-                    {allScenesGenerated && (
-                      <div className="mt-6 grid grid-cols-2 gap-2">
-                        <button
-                          onClick={assembleFinalVideo}
-                          disabled={isAssembling}
-                          className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-black uppercase tracking-wide py-3 px-3 rounded-xl flex items-center justify-center gap-2 text-[10px] whitespace-nowrap transition-all"
-                        >
-                          {isAssembling ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Film className="w-4 h-4 shrink-0" />}
-                          {isAssembling ? `${assemblyProgress}%` : 'Assemble'}
-                        </button>
-                        <button
-                          onClick={downloadAllClips}
-                          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black uppercase tracking-wide py-3 px-3 rounded-xl flex items-center justify-center gap-2 text-[10px] whitespace-nowrap transition-all border border-zinc-700"
-                        >
-                          <Download className="w-4 h-4 shrink-0" />
-                          Download Clips
-                        </button>
-                        {finalVideo && (
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 p-3">
                           <button
-                            onClick={downloadMaster}
-                            className="col-span-2 bg-[#12121e] hover:bg-[#1c1c2e] border border-white/10 hover:border-white/20 text-zinc-500 hover:text-zinc-300 font-black uppercase tracking-[0.2em] py-4 px-3 rounded-xl flex items-center justify-center gap-3 text-[10px] whitespace-nowrap transition-all duration-200"
+                            onClick={() => retryVariant(i)}
+                            disabled={isProcessing || isQueued}
+                            className="flex-1 flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-wider py-2 rounded-lg border transition-all disabled:opacity-30 disabled:cursor-not-allowed
+                              bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700"
+                            title="Generate a new take for this scene"
                           >
-                            <Download className="w-4 h-4 shrink-0 opacity-50" />
-                            Download Master Video
+                            <RefreshCw className="w-3 h-3" /> Re-generate
                           </button>
-                        )}
+                          <button
+                            onClick={() => setRepromptModal({ open: true, index: i, text: s.customPrompt || '' })}
+                            disabled={isProcessing || isQueued}
+                            className="flex-1 flex items-center justify-center gap-1.5 text-[9px] font-black uppercase tracking-wider py-2 rounded-lg border transition-all disabled:opacity-30 disabled:cursor-not-allowed
+                              bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30 hover:border-amber-400"
+                            title="Edit prompt and regenerate"
+                          >
+                            <Sparkles className="w-3 h-3" /> Re-prompt
+                          </button>
+                          {isDone && s.url && (
+                            <button
+                              onClick={() => fetchAndDownload(s.savedUrl || s.url, `scene_${i + 1}.mp4`, directoryHandle)}
+                              className="p-2 rounded-lg border bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 border-zinc-700 transition-all"
+                              title="Download this scene"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    );
+                  })}
                 </div>
 
-                {/* Bottom: System Logs (full width) */}
-                <div className="bg-black/40 border border-zinc-800/50 rounded-[2rem] overflow-hidden">
-                  <div className="flex items-center gap-3 px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/40">
-                    <Terminal className="w-4 h-4 text-cyan-500" />
-                    <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.3em]">Neural Process Output</span>
-                    <div className="ml-auto flex items-center gap-3">
-                      {isGenerating && (
-                        <span className="text-[9px] font-black text-cyan-500 uppercase tracking-widest animate-pulse">
-                          ● Live
-                        </span>
+                {/* Bottom row: Final video + controls */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Final assembled video */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-black text-white uppercase tracking-tight">Final Master Video</h3>
+                    <div className="aspect-video bg-black rounded-2xl overflow-hidden border border-zinc-800">
+                      {isAssembling ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-zinc-700 gap-3">
+                          <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-cyan-500">Assembling {assemblyProgress}%</span>
+                        </div>
+                      ) : finalVideo ? (
+                        <video src={finalVideo} controls autoPlay loop className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-zinc-700 gap-2">
+                          <Film className="w-8 h-8" />
+                          <span className="text-[10px] font-black uppercase tracking-widest">Waiting for assembly</span>
+                        </div>
                       )}
-                      <div className="flex gap-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-500/30" />
-                      </div>
+                    </div>
+                    {/* Action buttons */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={assembleFinalVideo}
+                        disabled={isAssembling || !remadeScenes.some(s => s.status === 'done')}
+                        className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-black uppercase tracking-wide py-3 px-3 rounded-xl flex items-center justify-center gap-2 text-[10px] transition-all"
+                      >
+                        {isAssembling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Film className="w-4 h-4" />}
+                        {isAssembling ? `Assembling ${assemblyProgress}%` : 'Assemble'}
+                      </button>
+                      <button
+                        onClick={downloadAllClips}
+                        className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black uppercase tracking-wide py-3 px-3 rounded-xl flex items-center justify-center gap-2 text-[10px] border border-zinc-700 transition-all"
+                      >
+                        <Download className="w-4 h-4" /> Download Clips
+                      </button>
+                      {finalVideo && (
+                        <button
+                          onClick={downloadMaster}
+                          className="col-span-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-zinc-600 text-zinc-300 font-black uppercase tracking-widest py-3 px-3 rounded-xl flex items-center justify-center gap-2 text-[10px] transition-all"
+                        >
+                          <Download className="w-4 h-4" /> Download Master Video
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="p-6 font-mono text-[10px] space-y-2 overflow-y-auto h-[220px] hide-scrollbar">
-                    {logs.length === 0 ? (
-                      <div className="text-zinc-700 italic">Awaiting neural initialization...</div>
-                    ) : (
-                      logs.map((log, i) => (
-                        <div key={i} className={`flex gap-3 leading-relaxed border-l-2 pl-3 ${
-                          log.type === 'error' ? 'text-red-400 border-red-500/50' :
-                          log.type === 'success' ? 'text-cyan-400 border-cyan-500/50' :
-                          'text-zinc-500 border-zinc-800'
-                        }`}>
-                          <span className="opacity-30 shrink-0 font-bold">[{log.time}]</span>
-                          <span className="break-words">{log.message}</span>
-                        </div>
-                      ))
-                    )}
-                    <div ref={logsEndRef} />
+
+                  {/* System Logs (right column, same row as final video) */}
+                  <div className="bg-black/40 border border-zinc-800/50 rounded-2xl overflow-hidden flex flex-col">
+                    <div className="flex items-center gap-3 px-5 py-3.5 border-b border-zinc-800/50 bg-zinc-900/40">
+                      <Terminal className="w-4 h-4 text-cyan-500" />
+                      <span className="text-[10px] font-black text-white/50 uppercase tracking-[0.3em]">System Logs</span>
+                      {isGenerating && (
+                        <span className="ml-auto text-[9px] font-black text-cyan-500 uppercase tracking-widest animate-pulse">● Live</span>
+                      )}
+                    </div>
+                    <div className="flex-1 p-5 font-mono text-[10px] space-y-2 overflow-y-auto hide-scrollbar min-h-[200px] max-h-[320px]">
+                      {logs.length === 0 ? (
+                        <div className="text-zinc-700 italic">Awaiting operations...</div>
+                      ) : (
+                        logs.map((log, i) => (
+                          <div key={i} className={`flex gap-3 leading-relaxed border-l-2 pl-3 ${
+                            log.type === 'error' ? 'text-red-400 border-red-500/50' :
+                            log.type === 'success' ? 'text-cyan-400 border-cyan-500/50' :
+                            'text-zinc-500 border-zinc-800'
+                          }`}>
+                            <span className="opacity-30 shrink-0 font-bold">[{log.time}]</span>
+                            <span className="break-words">{log.message}</span>
+                          </div>
+                        ))
+                      )}
+                      <div ref={logsEndRef} />
+                    </div>
                   </div>
                 </div>
               </div>

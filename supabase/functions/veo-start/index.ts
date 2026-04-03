@@ -74,27 +74,32 @@ serve(async (req) => {
     const saJson = Deno.env.get('GOOGLE_SA_JSON')
     if (!saJson) throw new Error('GOOGLE_SA_JSON secret is not configured in Supabase.')
 
-    // Debug: show first 80 chars to diagnose format issues
-    const preview = saJson.substring(0, 80).replace(/\n/g, '\\n')
-    console.log(`GOOGLE_SA_JSON preview: [${preview}]`)
-
-    // Strip outer quotes if user accidentally wrapped in single/double quotes
-    let jsonStr = saJson.trim()
-    if ((jsonStr.startsWith("'") && jsonStr.endsWith("'")) ||
-        (jsonStr.startsWith('"') && jsonStr.endsWith('"'))) {
-      jsonStr = jsonStr.slice(1, -1)
-    }
-
-    let sa: Record<string, string>
-    try {
-      sa = JSON.parse(jsonStr)
-    } catch (parseErr) {
-      throw new Error(`GOOGLE_SA_JSON is invalid JSON. First 80 chars: [${preview}]. Parse error: ${parseErr}`)
-    }
+    const sa: Record<string, string> = (() => {
+      let str = saJson.trim()
+      if ((str.startsWith("'") && str.endsWith("'")) ||
+          (str.startsWith('"') && str.endsWith('"'))) {
+        str = str.slice(1, -1)
+      }
+      try {
+        return JSON.parse(str)
+      } catch (e) {
+        throw new Error(`GOOGLE_SA_JSON invalid JSON. First 80 chars: [${str.substring(0, 80)}]. Err: ${e}`)
+      }
+    })()
     const projectId = sa.project_id
     const location = 'us-central1'
 
     const { prompt, image, aspectRatio = '16:9', model = 'veo-2.0-generate-001' } = await req.json()
+
+    // Vertex AI uses different model IDs from the Gemini Developer API.
+    // Map Gemini-API names → Vertex AI publisher model names.
+    const VERTEX_MODEL_MAP: Record<string, string> = {
+      'veo-3.1-fast-generate-preview': 'veo-3.0-generate-preview', // no "fast" variant on Vertex; use 3.0
+      'veo-3-generate-preview':        'veo-3.0-generate-preview', // Vertex needs explicit ".0"
+      'veo-3.0-generate-preview':      'veo-3.0-generate-preview',
+      'veo-2.0-generate-001':          'veo-2.0-generate-001',
+    }
+    const vertexModel = VERTEX_MODEL_MAP[model] ?? 'veo-2.0-generate-001'
 
     const token = await getAccessToken(sa)
 
@@ -112,7 +117,7 @@ serve(async (req) => {
       },
     }
 
-    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:predictLongRunning`
+    const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${vertexModel}:predictLongRunning`
 
     const genRes = await fetch(endpoint, {
       method: 'POST',

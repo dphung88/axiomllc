@@ -103,12 +103,21 @@ serve(async (req) => {
     const { operationName, model = 'veo-2.0-generate-001' } = await req.json()
     if (!operationName) throw new Error('operationName is required')
 
+    // Map Gemini Developer API model names → Vertex AI publisher model names
+    const VERTEX_MODEL_MAP: Record<string, string> = {
+      'veo-3.1-fast-generate-preview': 'veo-3.0-generate-preview',
+      'veo-3-generate-preview':        'veo-3.0-generate-preview',
+      'veo-3.0-generate-preview':      'veo-3.0-generate-preview',
+      'veo-2.0-generate-001':          'veo-2.0-generate-001',
+    }
+    const vertexModel = VERTEX_MODEL_MAP[model] ?? 'veo-2.0-generate-001'
+
     const location = 'us-central1'
     const projectId = sa.project_id
     const token = await getAccessToken(sa)
 
     // Veo uses fetchPredictOperation (not standard LRO endpoint)
-    const fetchOpUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:fetchPredictOperation`
+    const fetchOpUrl = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${vertexModel}:fetchPredictOperation`
     const pollRes = await fetch(fetchOpUrl, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

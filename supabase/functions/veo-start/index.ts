@@ -89,17 +89,24 @@ serve(async (req) => {
     const projectId = sa.project_id
     const location = 'us-central1'
 
-    const { prompt, image, aspectRatio = '16:9', model = 'veo-2.0-generate-001' } = await req.json()
+    const {
+      prompt,
+      image,
+      aspectRatio = '16:9',
+      model = 'veo-2.0-generate-001',
+      generateAudio = false,  // Veo 3 supports audio; frontend sets this true for Veo 3 models
+    } = await req.json()
 
-    // Vertex AI uses different model IDs from the Gemini Developer API.
-    // Map Gemini-API names → Vertex AI publisher model names.
+    // Safety net: map Gemini API model names → Vertex AI model IDs in case
+    // the frontend mapping is on an older deploy.
     const VERTEX_MODEL_MAP: Record<string, string> = {
-      'veo-3.1-fast-generate-preview': 'veo-3.0-generate-preview', // no "fast" variant on Vertex; use 3.0
-      'veo-3-generate-preview':        'veo-3.0-generate-preview', // Vertex needs explicit ".0"
+      'veo-3.1-fast-generate-preview': 'veo-3.0-generate-preview',
+      'veo-3-generate-preview':        'veo-3.0-generate-preview',
       'veo-3.0-generate-preview':      'veo-3.0-generate-preview',
       'veo-2.0-generate-001':          'veo-2.0-generate-001',
     }
     const vertexModel = VERTEX_MODEL_MAP[model] ?? 'veo-2.0-generate-001'
+    const isVeo3 = vertexModel.includes('veo-3')
 
     const token = await getAccessToken(sa)
 
@@ -109,12 +116,18 @@ serve(async (req) => {
       instance.image = { bytesBase64Encoded: image.data, mimeType: image.mimeType || 'image/jpeg' }
     }
 
+    const parameters: Record<string, unknown> = {
+      aspectRatio,
+      sampleCount: 1,
+    }
+    // Veo 3 supports native audio generation — must be explicitly enabled
+    if (isVeo3 || generateAudio) {
+      parameters.generateAudio = true
+    }
+
     const body = {
       instances: [instance],
-      parameters: {
-        aspectRatio,
-        sampleCount: 1,
-      },
+      parameters,
     }
 
     const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${vertexModel}:predictLongRunning`

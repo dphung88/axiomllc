@@ -11,15 +11,18 @@ export const getAiClient = () => {
 
 /**
  * Vertex AI publisher model IDs differ from Gemini Developer API names.
- * Map UI-facing model names → the correct Vertex AI model identifier
- * so the edge function receives a name that Vertex AI actually recognises.
+ * Map UI-facing model names → the correct Vertex AI model identifier.
+ * Veo 3 on Vertex AI uses veo-3.0-generate-preview (with audio support).
+ * Veo 2 has no audio generation.
  */
 const VERTEX_MODEL_MAP: Record<string, string> = {
-  'veo-3.1-fast-generate-preview': 'veo-2.0-generate-001', // no fast/3.1 variant on Vertex
-  'veo-3-generate-preview':        'veo-2.0-generate-001', // Veo 3 not yet GA on Vertex
-  'veo-3.0-generate-preview':      'veo-2.0-generate-001',
+  'veo-3.1-fast-generate-preview': 'veo-3.0-generate-preview', // no fast variant on Vertex; use 3.0
+  'veo-3-generate-preview':        'veo-3.0-generate-preview', // Gemini API name → Vertex name
+  'veo-3.0-generate-preview':      'veo-3.0-generate-preview',
   'veo-2.0-generate-001':          'veo-2.0-generate-001',
 };
+
+const isVeo3Model = (model: string) => model.includes('veo-3');
 
 const vertexStart = async (
   prompt: string,
@@ -28,11 +31,12 @@ const vertexStart = async (
   model = 'veo-2.0-generate-001',
 ): Promise<string> => {
   const vertexModel = VERTEX_MODEL_MAP[model] ?? 'veo-2.0-generate-001';
+  const generateAudio = isVeo3Model(vertexModel); // Veo 3 supports audio; Veo 2 does not
   const edgeUrl = getSupabaseEdgeUrl();
   const res = await fetch(`${edgeUrl}/veo-start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, image, aspectRatio, model: vertexModel }),
+    body: JSON.stringify({ prompt, image, aspectRatio, model: vertexModel, generateAudio }),
   });
   const data = await res.json();
   if (data.error) throw new Error(`Vertex AI (veo-start): ${data.error}`);
@@ -45,7 +49,7 @@ const vertexPoll = async (
   onProgress?: (msg: string) => void,
   model = 'veo-2.0-generate-001',
 ): Promise<string> => {
-  const vertexModel = VERTEX_MODEL_MAP[model] ?? 'veo-2.0-generate-001';
+  const vertexModel = VERTEX_MODEL_MAP[model] ?? 'veo-2.0-generate-001'; // already mapped by vertexStart
   const edgeUrl = getSupabaseEdgeUrl();
   const startTime = Date.now();
   const timeoutMs = 12 * 60 * 1000; // 12 minutes

@@ -21,7 +21,7 @@ const parseErrorMessage = (err: string): string => {
 };
 
 export function AutoStoryGen() {
-  const { customApiKey, storagePath } = useSettings();
+  const { customApiKey, storagePath, provider } = useSettings();
   const {
     inputType, setInputType,
     idea, setIdea,
@@ -251,15 +251,27 @@ export function AutoStoryGen() {
               {/* Row 2: Model */}
               <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-3 ml-1">Model (Veo)</label>
-                  <select 
+                  <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-3 ml-1">
+                    {provider === 'bytedance' ? 'Model (Seedance)' : 'Model (Veo)'}
+                  </label>
+                  <select
                     value={veoModel}
                     onChange={(e) => setVeoModel(e.target.value)}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-cyan-500 font-sans focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 outline-none appearance-none transition-all"
                   >
-                    <option value="veo-3.1-fast-generate-preview">Veo 3.1 - Fast</option>
-                    <option value="veo-3.1-generate-preview">Veo 3.1 - High Quality</option>
-                    <option value="veo-2.0-generate-001">Veo 2.0 (Stable)</option>
+                    {provider === 'bytedance' ? (
+                      <>
+                        <option value="seedance-1-5-pro">Seedance 1.5 Pro (Audio + Video)</option>
+                        <option value="seedance-1-0-pro-fast">Seedance 1.0 Pro Fast</option>
+                        <option value="seedance-1-0-pro">Seedance 1.0 Pro</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="veo-3.1-fast-generate-preview">Veo 3.1 - Fast</option>
+                        <option value="veo-3.1-generate-preview">Veo 3.1 - High Quality</option>
+                        <option value="veo-2.0-generate-001">Veo 2.0 (Stable)</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>

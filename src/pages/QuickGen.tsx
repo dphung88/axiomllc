@@ -6,7 +6,7 @@ import { useQuickGen } from '../context/QuickGenContext';
 import { fetchAndDownload } from '../utils/downloadHelper';
 
 export function QuickGen() {
-  const { customApiKey, directoryHandle } = useSettings();
+  const { customApiKey, directoryHandle, provider } = useSettings();
   const {
     isGenerating,
     resultUrl,
@@ -188,8 +188,19 @@ export function QuickGen() {
                         onChange={(e) => setVeoModel(e.target.value)}
                         className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-5 py-4 text-cyan-500 font-sans focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 outline-none appearance-none transition-all cursor-pointer"
                       >
-                        <option value="veo-3.1-fast-generate-preview" className="bg-zinc-900">Veo 3.1 - Fast</option>
-                        <option value="veo-3.1-generate-preview" className="bg-zinc-900">Veo 3.1 - High Quality</option>
+                        {provider === 'bytedance' ? (
+                          <>
+                            <option value="seedance-1-5-pro" className="bg-zinc-900">Seedance 1.5 Pro (Audio + Video)</option>
+                            <option value="seedance-1-0-pro-fast" className="bg-zinc-900">Seedance 1.0 Pro Fast</option>
+                            <option value="seedance-1-0-pro" className="bg-zinc-900">Seedance 1.0 Pro</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="veo-3.1-fast-generate-preview" className="bg-zinc-900">Veo 3.1 - Fast</option>
+                            <option value="veo-3.1-generate-preview" className="bg-zinc-900">Veo 3.1 - High Quality</option>
+                            <option value="veo-2.0-generate-001" className="bg-zinc-900">Veo 2.0 (Stable)</option>
+                          </>
+                        )}
                       </select>
                       <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none opacity-30">
                         <ArrowRight className="w-4 h-4 rotate-90" />

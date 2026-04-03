@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { generateVideo, pollVideoOperation } from '../services/veoService';
+import { generateVideo, pollVideoOperation } from '../services/videoService';
 import { concatVideos } from '../services/videoAssemblyService';
 import { saveToStudioGallery } from '../services/supabase';
 import { useSettings } from './SettingsContext';

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { generateImage } from '../services/geminiService';
+import { generateImage } from '../services/aiService';
 import { saveToStudioGallery } from '../services/supabase';
 import { useSettings } from './SettingsContext';
 

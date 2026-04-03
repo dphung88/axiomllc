@@ -1,36 +1,30 @@
 
-export const getLlmModel = () => {
+function getSettings(): Record<string, any> {
   const saved = localStorage.getItem('studioSettings');
   if (saved) {
-    try {
-      const settings = JSON.parse(saved);
-      return settings.llmModel || 'gemini-2.5-flash';
-    } catch (e) {
-      return 'gemini-2.5-flash';
-    }
+    try { return JSON.parse(saved); } catch {}
   }
-  return 'gemini-2.5-flash';
+  return {};
+}
+
+export const getProvider = (): 'google' | 'bytedance' => {
+  return getSettings().provider ?? 'google';
+};
+
+export const getLlmModel = () => {
+  const s = getSettings();
+  if (s.provider === 'bytedance') {
+    return s.arkLlmModel || 'seed-2-0-lite-260228';
+  }
+  return s.llmModel || 'gemini-2.5-flash';
 };
 
 export const getApiKey = () => {
-  const saved = localStorage.getItem('studioSettings');
-  let key = '';
-
-  if (saved) {
-    try {
-      const settings = JSON.parse(saved);
-      if (settings.customApiKey) {
-        key = settings.customApiKey;
-      }
-    } catch (e) {
-      console.error('Error parsing studioSettings', e);
-    }
+  const s = getSettings();
+  if (s.provider === 'bytedance') {
+    return (s.arkApiKey || '').trim();
   }
-
-  // No env-var fallback — users must provide their own key via Settings.
-  // Falling back to a shared/owner key would charge their billing.
-
-  return key.trim();
+  return (s.customApiKey || '').trim();
 };
 
 /** Whether to route Veo video generation through Vertex AI (uses GCP $300 credits) */

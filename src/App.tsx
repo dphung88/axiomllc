@@ -17,7 +17,7 @@ import { Film, Wand2, Zap, Video, Sparkles, Image as ImageIcon, Settings as Sett
 import { RemakerProvider, useRemaker } from './context/RemakerContext';
 import { AutoStoryProvider, useAutoStory } from './context/AutoStoryContext';
 import { StoryBuilderProvider, useStoryBuilder } from './context/StoryBuilderContext';
-import { SettingsProvider } from './context/SettingsContext';
+import { SettingsProvider, useSettings } from './context/SettingsContext';
 import { QuickGenProvider, useQuickGen } from './context/QuickGenContext';
 import { ImageGenProvider, useImageGen } from './context/ImageGenContext';
 
@@ -28,14 +28,15 @@ function Sidebar() {
   const { isGenerating: quickIsGenerating } = useQuickGen();
   const { isGenerating: imageIsGenerating } = useImageGen();
   const storyBuilderState = useStoryBuilder();
-  
+  const { provider } = useSettings();
+
   const completedScenes = remadeScenes.filter(s => s.url || s.error).length;
   const totalScenes = scenes.length;
-  
+
   const sbCompleted = storyBuilderState.scenes.filter(s => s.status === 'done' || s.status === 'error').length;
   const sbTotal = storyBuilderState.scenes.length;
   const sbIsGenerating = storyBuilderState.isSequentialLoopRunning;
-  
+
   const links = [
     { path: '/', label: 'Image Gen', icon: ImageIcon },
     { path: '/quick', label: 'Quick Gen', icon: Zap },
@@ -52,6 +53,11 @@ function Sidebar() {
     }
   };
 
+  const providerLabel = provider === 'bytedance' ? 'Seedance · Seed 2.0' : 'Veo 3.1 · Gemini 2.5';
+  const providerBadgeColor = provider === 'bytedance'
+    ? 'text-orange-500 bg-orange-500/10 border-orange-500/20'
+    : 'text-cyan-600 bg-cyan-500/10 border-cyan-500/20';
+
   return (
     <div className="w-64 bg-main-bg border-r border-zinc-800 flex flex-col h-full shrink-0">
       <div className="p-6 flex items-center gap-3">
@@ -62,7 +68,7 @@ function Sidebar() {
           AXIOM LLC<br/><span className="text-cyan-500">Studio</span>
         </h1>
       </div>
-      
+
       <nav className="flex-1 px-4 py-4 space-y-1">
         {links.map(link => {
           const active = location.pathname === link.path;
@@ -110,15 +116,15 @@ function Sidebar() {
         })}
       </nav>
 
-      {/* Version badge */}
+      {/* Version + provider badge */}
       <div className="px-6 py-4 border-t border-zinc-800/60">
         <div className="flex items-center justify-between">
           <span className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.2em]">Version</span>
-          <span className="text-[9px] font-black text-cyan-600 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full tracking-widest">
+          <span className={`text-[9px] font-black border px-2 py-0.5 rounded-full tracking-widest ${providerBadgeColor}`}>
             v1.0.0
           </span>
         </div>
-        <p className="text-[8px] text-zinc-700 mt-1 tracking-wide">Powered by Veo 3.1 · Gemini 2.5</p>
+        <p className="text-[8px] text-zinc-700 mt-1 tracking-wide">Powered by {providerLabel}</p>
       </div>
     </div>
   );
@@ -144,22 +150,22 @@ export default function App() {
               <QuickGenProvider>
                 <ImageGenProvider>
                   <BrowserRouter>
-                <div className="flex h-screen bg-main-bg text-white font-sans overflow-hidden">
-                <Sidebar />
-                <main className="flex-1 overflow-y-auto relative bg-main-bg">
-                  <Routes>
-                    <Route path="/" element={<ImageGen />} />
-                    <Route path="/auto" element={<AutoStoryGen />} />
-                    <Route path="/story" element={<StoryBuilder />} />
-                    <Route path="/remaker" element={<StyleRemaker />} />
-                    <Route path="/quick" element={<QuickGen />} />
-                    <Route path="/gallery" element={<Gallery />} />
-                    <Route path="/settings" element={<Settings />} />
-                  </Routes>
-                    <Toast />
-                  </main>
-                </div>
-              </BrowserRouter>
+                    <div className="flex h-screen bg-main-bg text-white font-sans overflow-hidden">
+                      <Sidebar />
+                      <main className="flex-1 overflow-y-auto relative bg-main-bg">
+                        <Routes>
+                          <Route path="/" element={<ImageGen />} />
+                          <Route path="/auto" element={<AutoStoryGen />} />
+                          <Route path="/story" element={<StoryBuilder />} />
+                          <Route path="/remaker" element={<StyleRemaker />} />
+                          <Route path="/quick" element={<QuickGen />} />
+                          <Route path="/gallery" element={<Gallery />} />
+                          <Route path="/settings" element={<Settings />} />
+                        </Routes>
+                        <Toast />
+                      </main>
+                    </div>
+                  </BrowserRouter>
                 </ImageGenProvider>
               </QuickGenProvider>
             </StoryBuilderProvider>

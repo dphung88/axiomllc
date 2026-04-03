@@ -8,7 +8,7 @@ import { AspectRatio } from '../types';
 import { GenerationStatus } from '../components/GenerationStatus';
 
 export function StoryBuilder() {
-  const { projectName, directoryHandle } = useSettings();
+  const { projectName, directoryHandle, provider } = useSettings();
   const {
     scenes,
     isAssembling,
@@ -127,8 +127,19 @@ export function StoryBuilder() {
               onChange={(e) => setVeoModel(e.target.value)}
               className="bg-zinc-950 border border-zinc-800 rounded-xl pl-4 pr-10 py-4 text-xs font-black text-cyan-500 font-sans focus:outline-none focus:ring-2 focus:ring-cyan-500 appearance-none transition-all uppercase tracking-wider"
             >
-              <option value="veo-3.1-fast-generate-preview">Veo 3.1 - Fast</option>
-              <option value="veo-3.1-generate-preview">Veo 3.1 - High Quality</option>
+              {provider === 'bytedance' ? (
+                <>
+                  <option value="seedance-1-5-pro">Seedance 1.5 Pro</option>
+                  <option value="seedance-1-0-pro-fast">Seedance 1.0 Fast</option>
+                  <option value="seedance-1-0-pro">Seedance 1.0 Pro</option>
+                </>
+              ) : (
+                <>
+                  <option value="veo-3.1-fast-generate-preview">Veo 3.1 - Fast</option>
+                  <option value="veo-3.1-generate-preview">Veo 3.1 - High Quality</option>
+                  <option value="veo-2.0-generate-001">Veo 2.0 (Stable)</option>
+                </>
+              )}
             </select>
             <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
               <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-zinc-500"></div>

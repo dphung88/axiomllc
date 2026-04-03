@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { generateAutoScript, generateScriptFromVideo, extractFrames, regeneratePromptsFromCharacters } from '../services/geminiService';
-import { generateVideo, pollVideoOperation } from '../services/veoService';
+import { generateAutoScript, generateScriptFromVideo, extractFrames, regeneratePromptsFromCharacters } from '../services/aiService';
+import { generateVideo, pollVideoOperation } from '../services/videoService';
 import { concatVideos } from '../services/videoAssemblyService';
 import { saveToStudioGallery } from '../services/supabase';
 import { AspectRatio } from '../types';

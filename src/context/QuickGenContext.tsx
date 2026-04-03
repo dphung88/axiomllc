@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { generateVideo, pollVideoOperation } from '../services/veoService';
+import { generateVideo, pollVideoOperation } from '../services/videoService';
 import { saveToStudioGallery } from '../services/supabase';
 import { AspectRatio } from '../types';
 

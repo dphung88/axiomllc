@@ -1,17 +1,26 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { get, set } from 'idb-keyval';
 
+export type AIProvider = 'google' | 'bytedance';
+
 interface SettingsState {
+  provider: AIProvider;
   projectName: string;
   storagePath: string;
   defaultModel: string;
   llmModel: string;
   defaultAspectRatio: string;
+  // Google
   customApiKey: string;
   useVertexAI: boolean;
+  // ByteDance
+  arkApiKey: string;
+  arkDefaultModel: string;
+  arkLlmModel: string;
 }
 
 const initialState: SettingsState = {
+  provider: 'google',
   projectName: 'My Studio Project',
   storagePath: '/downloads/studio',
   defaultModel: 'veo-2.0-generate-001',
@@ -19,10 +28,14 @@ const initialState: SettingsState = {
   defaultAspectRatio: '16:9',
   customApiKey: '',
   useVertexAI: false,
+  arkApiKey: '',
+  arkDefaultModel: 'seedance-1-5-pro',
+  arkLlmModel: 'seed-2-0-lite-260228',
 };
 
 interface SettingsContextType extends SettingsState {
   directoryHandle: FileSystemDirectoryHandle | null;
+  setProvider: (provider: AIProvider) => void;
   setProjectName: (name: string) => void;
   setStoragePath: (path: string) => void;
   setDefaultModel: (model: string) => void;
@@ -30,6 +43,9 @@ interface SettingsContextType extends SettingsState {
   setDefaultAspectRatio: (ratio: string) => void;
   setCustomApiKey: (key: string) => void;
   setUseVertexAI: (val: boolean) => void;
+  setArkApiKey: (key: string) => void;
+  setArkDefaultModel: (model: string) => void;
+  setArkLlmModel: (model: string) => void;
   setDirectoryHandle: (handle: FileSystemDirectoryHandle | null) => void;
   resetSettings: () => void;
 }
@@ -41,31 +57,25 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const saved = localStorage.getItem('studioSettings');
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Auto-migrate deprecated models to latest
+      // Auto-migrate deprecated models
       if (parsed.llmModel?.startsWith('gemini-1.5') || parsed.llmModel === 'gemini-2.0-flash') {
         parsed.llmModel = 'gemini-2.5-flash';
       }
-      return parsed;
+      // Ensure new fields have defaults
+      return { ...initialState, ...parsed };
     }
     return initialState;
   });
   const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
 
-  // Load directory handle from IndexedDB
   useEffect(() => {
     get('studioDirectoryHandle').then((handle) => {
       if (handle) setDirectoryHandle(handle);
     });
   }, []);
 
-  // Save directory handle to IndexedDB
   useEffect(() => {
-    if (directoryHandle) {
-      set('studioDirectoryHandle', directoryHandle);
-    } else {
-      // If handle is null, we might want to clear it from IDB too
-      // but usually we just leave it or explicitly clear
-    }
+    if (directoryHandle) set('studioDirectoryHandle', directoryHandle);
   }, [directoryHandle]);
 
   useEffect(() => {
@@ -80,6 +90,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     <SettingsContext.Provider value={{
       ...state,
       directoryHandle,
+      setProvider: (provider) => updateState({ provider }),
       setProjectName: (projectName) => updateState({ projectName }),
       setStoragePath: (storagePath) => updateState({ storagePath }),
       setDefaultModel: (defaultModel) => updateState({ defaultModel }),
@@ -87,6 +98,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setDefaultAspectRatio: (defaultAspectRatio) => updateState({ defaultAspectRatio }),
       setCustomApiKey: (customApiKey) => updateState({ customApiKey }),
       setUseVertexAI: (useVertexAI) => updateState({ useVertexAI }),
+      setArkApiKey: (arkApiKey) => updateState({ arkApiKey }),
+      setArkDefaultModel: (arkDefaultModel) => updateState({ arkDefaultModel }),
+      setArkLlmModel: (arkLlmModel) => updateState({ arkLlmModel }),
       setDirectoryHandle: (handle) => setDirectoryHandle(handle),
       resetSettings: () => {
         setState(initialState);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload, Wand2, Loader2, Play, CheckCircle2, Video, RefreshCw, AlertCircle, Film, Download, Terminal, Layers, Sparkles, X, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { extractFrames, analyzeVideoScenes } from '../services/geminiService';
+import { extractFrames, analyzeVideoScenes } from '../services/aiService';
 import { useRemaker } from '../context/RemakerContext';
 import { useSettings } from '../context/SettingsContext';
 import { getApiKey, getLlmModel } from '../services/apiConfig';

@@ -23,6 +23,7 @@ export function Settings() {
     arkApiKey, setArkApiKey,
     arkDefaultModel, setArkDefaultModel,
     arkLlmModel, setArkLlmModel,
+    arkVideoEndpoint, setArkVideoEndpoint,
     bytedanceEnabled, setBytedanceEnabled,
   } = useSettings();
 
@@ -538,6 +539,43 @@ export function Settings() {
               <p className="text-sm font-medium">{arkTestResult.message}</p>
             </div>
           )}
+
+          {/* Seedance Video Endpoint ID */}
+          <div className="border-t border-zinc-800 pt-6 space-y-3">
+            <div>
+              <label className="block text-sm font-bold text-zinc-400 uppercase tracking-wider mb-1">
+                Seedance Video Endpoint ID
+              </label>
+              <p className="text-zinc-600 text-xs mb-3">
+                BytePlus requires a custom inference endpoint for video generation.{' '}
+                <a
+                  href="https://console.byteplus.com/ark/region:ark+ap-southeast-1/openManagement"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-orange-400 underline hover:text-orange-300"
+                >
+                  Console → Online Inference → Create Endpoint
+                </a>
+                {' '}→ copy the <strong className="text-zinc-400">ep-xxxx</strong> ID here.
+              </p>
+              <div className="relative">
+                <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                <input
+                  type="text"
+                  value={arkVideoEndpoint}
+                  onChange={(e) => setArkVideoEndpoint(e.target.value)}
+                  placeholder="ep-2025xxxxxxxxxxxxxxxxx"
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-4 py-3 text-orange-400 font-mono text-sm focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all"
+                />
+              </div>
+              {arkVideoEndpoint && (
+                <p className="text-[10px] text-emerald-500 mt-1.5 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                  Custom endpoint active — will override default model selection
+                </p>
+              )}
+            </div>
+          </div>
 
           <p className="text-[10px] text-zinc-600">
             Get your key at{' '}

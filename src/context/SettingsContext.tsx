@@ -18,6 +18,7 @@ interface SettingsState {
   arkApiKey: string;
   arkDefaultModel: string;
   arkLlmModel: string;
+  arkVideoEndpoint: string;   // Custom inference endpoint ID from BytePlus Console (ep-xxxx)
   bytedanceEnabled: boolean;
 }
 
@@ -34,6 +35,7 @@ const initialState: SettingsState = {
   arkApiKey: '',
   arkDefaultModel: 'seedance-1-5-pro',
   arkLlmModel: 'seed-2-0-lite-260228',
+  arkVideoEndpoint: '',
   bytedanceEnabled: true,
 };
 
@@ -51,6 +53,7 @@ interface SettingsContextType extends SettingsState {
   setArkApiKey: (key: string) => void;
   setArkDefaultModel: (model: string) => void;
   setArkLlmModel: (model: string) => void;
+  setArkVideoEndpoint: (endpoint: string) => void;
   setBytedanceEnabled: (val: boolean) => void;
   setDirectoryHandle: (handle: FileSystemDirectoryHandle | null) => void;
   resetSettings: () => void;
@@ -108,6 +111,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setArkApiKey: (arkApiKey) => updateState({ arkApiKey }),
       setArkDefaultModel: (arkDefaultModel) => updateState({ arkDefaultModel }),
       setArkLlmModel: (arkLlmModel) => updateState({ arkLlmModel }),
+      setArkVideoEndpoint: (arkVideoEndpoint) => updateState({ arkVideoEndpoint }),
       setBytedanceEnabled: (bytedanceEnabled) => updateState({ bytedanceEnabled }),
       setDirectoryHandle: (handle) => setDirectoryHandle(handle),
       resetSettings: () => {

@@ -29,6 +29,20 @@ export const getArkApiKey = (): string => {
   return (import.meta.env as any).VITE_ARK_API_KEY || '';
 };
 
+// Returns custom inference endpoint ID if set, otherwise falls back to SEEDANCE_MODEL_MAP lookup
+export const getArkVideoEndpoint = (uiModel: string): string => {
+  try {
+    const saved = localStorage.getItem('studioSettings');
+    if (saved) {
+      const s = JSON.parse(saved);
+      if (s.arkVideoEndpoint && s.arkVideoEndpoint.trim()) {
+        return s.arkVideoEndpoint.trim();
+      }
+    }
+  } catch (_) {}
+  return SEEDANCE_MODEL_MAP[uiModel] ?? uiModel;
+};
+
 export interface SeedanceOptions {
   model?: string;           // UI model key (from SEEDANCE_MODEL_MAP) or raw Seedance ID
   resolution?: '480p' | '720p' | '1080p';
@@ -47,9 +61,9 @@ export const seedanceStart = async (
   const apiKey = getArkApiKey();
   if (!apiKey) throw new Error('ARK API Key missing. Please enter it in Settings.');
 
-  // Resolve model ID
+  // Resolve model ID — uses custom endpoint if set in Settings, else falls back to model map
   const rawModel = options.model ?? 'seedance-1-5-pro';
-  const modelId = SEEDANCE_MODEL_MAP[rawModel] ?? rawModel;
+  const modelId = getArkVideoEndpoint(rawModel);
 
   const content: object[] = [{ type: 'text', text: prompt }];
   if (image) {

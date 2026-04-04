@@ -10,14 +10,13 @@
 const BASE_URL = 'https://ark.ap-southeast.bytepluses.com/api/v3';
 const VIDEO_TASKS = `${BASE_URL}/contents/generations/tasks`;
 
-// ─── Model map: UI label → Seedance model ID ─────────────────────────────────
-// Use model names without version suffix for stability.
+// ─── Model map: UI label → Seedance model ID (confirmed from BytePlus docs) ───
 // If BytePlus requires a custom inference endpoint (ep-xxxx), set it in
 // Settings → Seedance Video Endpoint ID — that will override these values.
 export const SEEDANCE_MODEL_MAP: Record<string, string> = {
-  'seedance-1-5-pro':      'seedance-1-5-pro',
-  'seedance-1-0-pro-fast': 'seedance-1-0-pro-fast',
-  'seedance-1-0-pro':      'seedance-1-0-pro',
+  'seedance-1-5-pro':      'seedance-1-5-pro-251215',
+  'seedance-1-0-pro-fast': 'seedance-1-0-pro-fast-251015',
+  'seedance-1-0-pro':      'seedance-1-0-pro-250428',
 };
 
 export const getArkApiKey = (): string => {
@@ -51,10 +50,12 @@ export interface SeedanceOptions {
   resolution?: '480p' | '720p' | '1080p';
   ratio?: '16:9' | '9:16' | '1:1' | '4:3' | '3:4' | '21:9';
   duration?: number;        // 2–12 seconds
-  generateAudio?: boolean;  // Seedance 1.5 Pro supports native audio
 }
 
 // ─── Create task ──────────────────────────────────────────────────────────────
+// Per BytePlus docs: parameters are embedded as inline flags in the text prompt,
+// NOT as separate top-level body fields.
+// Correct format: "prompt text --ratio 16:9 --resolution 720p --duration 5 --camerafixed false"
 
 export const seedanceStart = async (
   prompt: string,
@@ -68,24 +69,21 @@ export const seedanceStart = async (
   const rawModel = options.model ?? 'seedance-1-5-pro';
   const modelId = getArkVideoEndpoint(rawModel);
 
-  const content: object[] = [{ type: 'text', text: prompt }];
+  // Build text with inline parameter flags (BytePlus Seedance API format)
+  const ratio      = options.ratio ?? '16:9';
+  const resolution = options.resolution ?? '720p';
+  const duration   = options.duration ?? 5;
+  const textWithFlags = `${prompt} --ratio ${ratio} --resolution ${resolution} --duration ${duration} --camerafixed false`;
+
+  // Image goes first (if present), then text with flags
+  const content: object[] = [];
   if (image) {
-    // ByteDance accepts data URLs directly in image_url
     content.push({
       type: 'image_url',
       image_url: { url: `data:${image.mimeType};base64,${image.data}` },
     });
   }
-
-  const body: Record<string, unknown> = {
-    model: modelId,
-    content,
-    resolution: options.resolution ?? '720p',
-    ratio: options.ratio ?? '16:9',
-    duration: options.duration ?? 5,
-    generate_audio: options.generateAudio ?? true, // Seedance 1.5 Pro: native audio
-    watermark: false,
-  };
+  content.push({ type: 'text', text: textWithFlags });
 
   const res = await fetch(VIDEO_TASKS, {
     method: 'POST',
@@ -93,7 +91,7 @@ export const seedanceStart = async (
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ model: modelId, content }),
   });
 
   const data = await res.json();

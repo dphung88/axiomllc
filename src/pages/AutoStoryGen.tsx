@@ -116,7 +116,7 @@ export function AutoStoryGen() {
   const downloadAllClips = () => {
     addLog("Downloading all generated clips...", "info");
     scenesState.forEach((scene, i) => {
-      const videoUrl = scene.url;
+      const videoUrl = scene.savedUrl || scene.url;
       if (videoUrl) {
         const a = document.createElement('a');
         a.href = videoUrl;
@@ -783,7 +783,9 @@ export function AutoStoryGen() {
                           <div className="aspect-video bg-black relative flex items-center justify-center flex-1">
                             {/* Show active variant or fallback */}
                             {(() => {
-                              const activeUrl = scene.activeVariant === 2 && scene.url2 ? scene.url2 : scene.url;
+                              const activeUrl = scene.activeVariant === 2
+                                ? (scene.savedUrl2 || scene.url2)
+                                : (scene.savedUrl || scene.url);
                               if (activeUrl) return (
                                 <video src={activeUrl} className="w-full h-full object-contain" controls />
                               );

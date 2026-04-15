@@ -111,7 +111,7 @@ export const seedanceStart = async (
 
   const data = await res.json();
   if (data.error) throw new Error(data.error);
-  if (!data.taskId) throw new Error('seedance-start returned no taskId');
+  if (!data.taskId) throw new Error(`seedance-start returned no taskId. Raw response: ${JSON.stringify(data)}`);
   return data.taskId as string;
 };
 

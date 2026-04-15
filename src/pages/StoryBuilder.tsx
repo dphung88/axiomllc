@@ -8,7 +8,7 @@ import { AspectRatio } from '../types';
 import { GenerationStatus } from '../components/GenerationStatus';
 
 export function StoryBuilder() {
-  const { projectName, directoryHandle, provider } = useSettings();
+  const { projectName, directoryHandle, provider, setProvider } = useSettings();
   const {
     scenes,
     isAssembling,
@@ -121,6 +121,23 @@ export function StoryBuilder() {
             </button>
           </div>
 
+          {/* Provider toggle */}
+          <div className="flex bg-zinc-950 rounded-xl p-1.5 border border-zinc-800">
+            <button
+              onClick={() => setProvider('google')}
+              className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${provider === 'google' ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              Google
+            </button>
+            <button
+              onClick={() => setProvider('bytedance')}
+              className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${provider === 'bytedance' ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
+            >
+              Seedance
+            </button>
+          </div>
+
+          {/* Model selector */}
           <div className="relative">
             <select
               value={veoModel}

@@ -48,8 +48,9 @@ export const uploadToStorage = async (blob: Blob, type: 'image' | 'video'): Prom
 
 // Resolve any URL to a permanent R2 storage URL
 const resolveToStorageUrl = async (url: string, type: 'image' | 'video'): Promise<string> => {
-  // Already a permanent R2 URL
+  // Already a permanent R2 URL (check both configured URL and generic r2.dev domain)
   if (r2PublicUrl && url.startsWith(r2PublicUrl)) return url;
+  if (url.includes('.r2.dev/') || url.includes('.r2.cloudflarestorage.com/')) return url;
   // Backward compat: already a Supabase storage URL
   if (url.includes(supabaseUrl) && url.includes('/storage/')) return url;
 

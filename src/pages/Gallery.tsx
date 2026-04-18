@@ -37,7 +37,8 @@ const extractStoragePath = (url: string): string | null => {
 
 const isValidStorageUrl = (url: string) =>
   url.startsWith('data:') ||
-  (R2_PUBLIC_URL ? url.startsWith(R2_PUBLIC_URL) : false) ||
+  url.includes('.r2.dev/') ||
+  url.includes('.r2.cloudflarestorage.com/') ||
   (url.startsWith('https://') && url.includes('/storage/'));
 
 export function Gallery() {

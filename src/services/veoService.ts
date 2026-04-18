@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { getApiKey, getUseVertexAI, getSupabaseEdgeUrl } from './apiConfig';
+import { getApiKey, getUseVertexAI, getSupabaseEdgeUrl, getSupabaseEdgeHeaders } from './apiConfig';
 
 export const getAiClient = () => {
   const apiKey = getApiKey();
@@ -39,7 +39,7 @@ const vertexStart = async (
   const edgeUrl = getSupabaseEdgeUrl();
   const res = await fetch(`${edgeUrl}/veo-start`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...getSupabaseEdgeHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, image, aspectRatio, model: vertexModel, generateAudio }),
   });
   const data = await res.json();
@@ -68,7 +68,7 @@ const vertexPoll = async (
 
     const res = await fetch(`${edgeUrl}/veo-poll`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...getSupabaseEdgeHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ operationName, model: vertexModel }),
     });
 

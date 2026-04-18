@@ -1,11 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseEdgeHeaders } from './apiConfig';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const r2PublicUrl = (import.meta.env.VITE_R2_PUBLIC_URL || '').replace(/\/$/, '');
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const STORAGE_BUCKET = 'studio-media';
+const edgeUrl = () => supabaseUrl ? `${supabaseUrl}/functions/v1` : '';
 
 // Convert base64 data: URL to Blob
 const dataUrlToBlob = (dataUrl: string): Blob => {
@@ -17,39 +19,40 @@ const dataUrlToBlob = (dataUrl: string): Blob => {
   return new Blob([bytes], { type: mimeType });
 };
 
-// Upload a Blob to Supabase Storage, return permanent public URL
+// Upload a Blob to Cloudflare R2 via Edge Function, return permanent public URL
 export const uploadToStorage = async (blob: Blob, type: 'image' | 'video'): Promise<string> => {
+  const base = edgeUrl();
+  if (!base) throw new Error('VITE_SUPABASE_URL not configured');
+
   const ext = type === 'video'
     ? (blob.type.includes('mp4') ? 'mp4' : 'webm')
     : (blob.type.includes('png') ? 'png' : 'jpg');
-  const filename = `${type}s/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-  const { error } = await supabase.storage
-    .from(STORAGE_BUCKET)
-    .upload(filename, blob, {
-      contentType: blob.type || (type === 'video' ? 'video/mp4' : 'image/jpeg'),
-      upsert: false,
-    });
+  const res = await fetch(`${base}/r2-upload?type=${type}&ext=${ext}`, {
+    method: 'POST',
+    body: blob,
+    headers: {
+      ...getSupabaseEdgeHeaders(),
+      'Content-Type': blob.type || (type === 'video' ? 'video/mp4' : 'image/jpeg'),
+    },
+  });
 
-  if (error) throw error;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as any).error || `R2 upload failed: ${res.status}`);
+  }
 
-  const { data: { publicUrl } } = supabase.storage
-    .from(STORAGE_BUCKET)
-    .getPublicUrl(filename);
-
-  return publicUrl;
+  const { url } = await res.json();
+  return url;
 };
 
-// Resolve URL to permanent Supabase Storage URL:
-// - blob: URLs  → fetch blob → upload → return permanent URL
-// - data: URLs  → convert to blob → upload → return permanent URL
-// - https: URLs → upload from fetch → return permanent URL
-// - already Supabase storage URLs → return as-is
+// Resolve any URL to a permanent R2 storage URL
 const resolveToStorageUrl = async (url: string, type: 'image' | 'video'): Promise<string> => {
-  // Already a permanent Supabase storage URL — no need to re-upload
+  // Already a permanent R2 URL
+  if (r2PublicUrl && url.startsWith(r2PublicUrl)) return url;
+  // Backward compat: already a Supabase storage URL
   if (url.includes(supabaseUrl) && url.includes('/storage/')) return url;
 
-  // Never store dead blob: URLs — they expire when the page closes
   if (url.startsWith('blob:')) {
     let blob: Blob;
     try {
@@ -57,22 +60,19 @@ const resolveToStorageUrl = async (url: string, type: 'image' | 'video'): Promis
       if (!res.ok) throw new Error('Blob URL already expired');
       blob = await res.blob();
     } catch {
-      throw new Error('[supabase] Blob URL expired before upload could complete. Cannot save to gallery.');
+      throw new Error('[storage] Blob URL expired before upload could complete. Cannot save to gallery.');
     }
     return await uploadToStorage(blob, type);
   }
 
   let blob: Blob;
-
   if (url.startsWith('data:')) {
     blob = dataUrlToBlob(url);
   } else {
-    // https: external URL — fetch and re-upload to our storage
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Fetch failed: ${res.statusText}`);
     blob = await res.blob();
   }
-
   return await uploadToStorage(blob, type);
 };
 
@@ -90,20 +90,16 @@ export const saveToStudioGallery = async (data: {
   let permanentUrl: string;
 
   try {
-    console.log(`[Gallery] Uploading ${data.type} to Supabase Storage...`);
+    console.log(`[Gallery] Uploading ${data.type} to R2...`);
     permanentUrl = await resolveToStorageUrl(data.url, data.type);
-    console.log(`[Gallery] Storage upload done → ${permanentUrl}`);
+    console.log(`[Gallery] R2 upload done → ${permanentUrl}`);
   } catch (storageErr: any) {
-    // Storage upload failed — diagnose clearly
-    console.error('[Gallery] ❌ Supabase Storage upload failed:', storageErr?.message || storageErr);
-    console.error('[Gallery] → Check: bucket "studio-media" exists? Bucket is public? RLS allows insert?');
+    console.error('[Gallery] ❌ R2 upload failed:', storageErr?.message || storageErr);
 
-    // For images with data: URL — store directly in DB (never expires)
     if (data.url.startsWith('data:')) {
-      console.warn('[Gallery] Falling back to storing data: URL directly in DB (no storage)');
+      console.warn('[Gallery] Falling back to storing data: URL directly in DB');
       permanentUrl = data.url;
     } else {
-      // For blob/https URLs that failed to upload — skip saving to avoid dead URLs in DB
       console.error('[Gallery] Cannot save video with temporary URL. Skipping gallery save.');
       return null;
     }
@@ -121,7 +117,7 @@ export const saveToStudioGallery = async (data: {
       }]);
 
     if (error) {
-      console.error('[Gallery] ❌ Supabase DB insert failed:', error.message, error.details, error.hint);
+      console.error('[Gallery] ❌ DB insert failed:', error.message);
       throw error;
     }
     console.log(`[Gallery] ✅ Saved ${data.type} to gallery.`);
@@ -132,23 +128,21 @@ export const saveToStudioGallery = async (data: {
   }
 };
 
-// Diagnostic: check if Supabase Storage bucket is accessible
-// Uses list() instead of getBucket() — getBucket() is admin-only and fails with anon key
+// Diagnostic: check if R2 upload is working
 export const checkStorageBucket = async (): Promise<{ ok: boolean; error?: string }> => {
+  const base = edgeUrl();
+  if (!base) return { ok: false, error: 'VITE_SUPABASE_URL not configured' };
   try {
-    // Step 1: Check READ — list files in bucket (needs SELECT policy)
-    const { error: listError } = await supabase.storage.from(STORAGE_BUCKET).list('', { limit: 1 });
-    if (listError) return { ok: false, error: `Read failed: ${listError.message}` };
-
-    // Step 2: Check WRITE — upload a tiny test file (needs INSERT policy)
     const testBlob = new Blob(['ok'], { type: 'text/plain' });
-    const testPath = `_healthcheck_${Date.now()}.txt`;
-    const { error: uploadError } = await supabase.storage.from(STORAGE_BUCKET).upload(testPath, testBlob);
-    if (uploadError) return { ok: false, error: `Write failed: ${uploadError.message}` };
-
-    // Cleanup test file
-    await supabase.storage.from(STORAGE_BUCKET).remove([testPath]);
-
+    const res = await fetch(`${base}/r2-upload?type=image&ext=txt`, {
+      method: 'POST',
+      body: testBlob,
+      headers: { ...getSupabaseEdgeHeaders(), 'Content-Type': 'text/plain' },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { ok: false, error: (err as any).error || `R2 check failed: ${res.status}` };
+    }
     return { ok: true };
   } catch (e: any) {
     return { ok: false, error: e?.message || 'Unknown error' };

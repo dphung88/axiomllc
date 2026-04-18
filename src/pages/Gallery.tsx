@@ -16,11 +16,16 @@ interface GalleryItem {
 }
 
 const STORAGE_BUCKET = 'studio-media';
+const R2_PUBLIC_URL = (import.meta.env.VITE_R2_PUBLIC_URL || '').replace(/\/$/, '');
 
-// Extract storage path from a Supabase public URL
-// e.g. https://xxx.supabase.co/storage/v1/object/public/studio-media/videos/abc.mp4 → videos/abc.mp4
+// Extract storage path (key) from a storage URL
+// R2: https://pub-xxx.r2.dev/videos/abc.mp4 → videos/abc.mp4
+// Legacy Supabase: https://xxx.supabase.co/storage/v1/object/public/studio-media/videos/abc.mp4 → videos/abc.mp4
 const extractStoragePath = (url: string): string | null => {
   try {
+    if (R2_PUBLIC_URL && url.startsWith(R2_PUBLIC_URL)) {
+      return url.slice(R2_PUBLIC_URL.length).replace(/^\//, '');
+    }
     const marker = `/object/public/${STORAGE_BUCKET}/`;
     const idx = url.indexOf(marker);
     if (idx === -1) return null;
@@ -32,6 +37,7 @@ const extractStoragePath = (url: string): string | null => {
 
 const isValidStorageUrl = (url: string) =>
   url.startsWith('data:') ||
+  (R2_PUBLIC_URL ? url.startsWith(R2_PUBLIC_URL) : false) ||
   (url.startsWith('https://') && url.includes('/storage/'));
 
 export function Gallery() {

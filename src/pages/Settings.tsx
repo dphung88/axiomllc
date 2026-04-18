@@ -615,8 +615,8 @@ export function Settings() {
           {bucketResult && (
             <div className={`p-4 rounded-xl border flex items-start gap-3 text-sm ${bucketResult.ok ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400' : 'bg-red-500/5 border-red-500/20 text-red-400'}`}>
               {bucketResult.ok
-                ? <><CheckCircle2 className="w-5 h-5 shrink-0" /><span>Bucket "studio-media" is accessible.</span></>
-                : <><AlertCircle className="w-5 h-5 shrink-0" /><div><p className="font-bold">Bucket error: {bucketResult.error}</p><p className="text-xs mt-1 opacity-80">Go to Supabase Dashboard → Storage → Create bucket "studio-media" → set Public → add INSERT policy for anon role.</p></div></>
+                ? <><CheckCircle2 className="w-5 h-5 shrink-0" /><span>R2 storage (ai-studio-saas) is accessible.</span></>
+                : <><AlertCircle className="w-5 h-5 shrink-0" /><div><p className="font-bold">R2 storage error: {bucketResult.error}</p><p className="text-xs mt-1 opacity-80">Check Supabase Edge Function secrets: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL.</p></div></>
               }
             </div>
           )}

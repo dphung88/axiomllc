@@ -1,8 +1,8 @@
-// Vertex AI Veo — Poll operation + download from GCS + upload to Supabase Storage
-// Returns { done: false } while generating, { done: true, url: supabaseUrl } when complete
+// Vertex AI Veo — Poll operation + download from GCS + upload to Cloudflare R2
+// Returns { done: false } while generating, { done: true, url: r2Url } when complete
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.11'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -197,23 +197,26 @@ serve(async (req) => {
       videoBuffer = await downloadRes.arrayBuffer()
     }
 
-    // Upload to Supabase Storage
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    // Upload to Cloudflare R2
+    const accountId = Deno.env.get('R2_ACCOUNT_ID')!
+    const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID')!
+    const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY')!
+    const bucket = Deno.env.get('R2_BUCKET_NAME') || 'studio-media'
+    const r2PublicUrl = Deno.env.get('R2_PUBLIC_URL')!
+
+    const key = `videos/vertex-${Date.now()}-${Math.random().toString(36).slice(2)}.mp4`
+    const r2 = new AwsClient({ accessKeyId, secretAccessKey, service: 's3', region: 'auto' })
+
+    const uploadRes = await r2.fetch(
+      `https://${accountId}.r2.cloudflarestorage.com/${bucket}/${key}`,
+      { method: 'PUT', body: videoBuffer, headers: { 'Content-Type': 'video/mp4' } },
     )
+    if (!uploadRes.ok) {
+      const errText = await uploadRes.text()
+      throw new Error(`R2 upload failed (${uploadRes.status}): ${errText}`)
+    }
 
-    const filename = `videos/vertex-${Date.now()}-${Math.random().toString(36).slice(2)}.mp4`
-
-    const { error: uploadError } = await supabase.storage
-      .from('studio-media')
-      .upload(filename, videoBuffer, { contentType: 'video/mp4', upsert: true })
-
-    if (uploadError) throw new Error(`Supabase upload failed: ${uploadError.message}`)
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('studio-media')
-      .getPublicUrl(filename)
+    const publicUrl = `${r2PublicUrl.replace(/\/$/, '')}/${key}`
 
     return new Response(JSON.stringify({ done: true, url: publicUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

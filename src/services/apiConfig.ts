@@ -47,3 +47,13 @@ export const getSupabaseEdgeUrl = (): string => {
   const url = env.VITE_SUPABASE_URL || '';
   return url ? `${url}/functions/v1` : '';
 };
+
+/** Standard headers required for Supabase Edge Function calls */
+export const getSupabaseEdgeHeaders = (): Record<string, string> => {
+  const env = import.meta.env as Record<string, string | undefined>;
+  const anonKey = env.VITE_SUPABASE_ANON_KEY || '';
+  return {
+    'apikey': anonKey,
+    'Authorization': `Bearer ${anonKey}`,
+  };
+};

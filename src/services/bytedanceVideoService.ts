@@ -14,6 +14,11 @@ const getEdgeUrl = (): string => {
   return url ? `${url}/functions/v1` : '';
 };
 
+const getEdgeHeaders = (): Record<string, string> => {
+  const anonKey = (import.meta.env as any).VITE_SUPABASE_ANON_KEY || '';
+  return { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` };
+};
+
 // ─── Model map: UI label → Seedance model ID (confirmed from BytePlus docs) ───
 // If BytePlus requires a custom inference endpoint (ep-xxxx), set it in
 // Settings → Seedance Video Endpoint ID — that will override these values.
@@ -75,7 +80,7 @@ export const seedanceStart = async (
 
   const res = await fetch(`${edgeUrl}/seedance-start`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...getEdgeHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify({
       apiKey,
       modelId,
@@ -112,7 +117,7 @@ export const seedancePoll = async (
 
     const res = await fetch(`${edgeUrl}/seedance-poll`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...getEdgeHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ apiKey, taskId }),
     });
     const data = await res.json();

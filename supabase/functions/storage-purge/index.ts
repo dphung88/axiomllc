@@ -1,97 +1,120 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.11'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
+
+function getR2Client() {
+  const accountId = Deno.env.get('R2_ACCOUNT_ID')!
+  const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID')!
+  const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY')!
+  const bucket = Deno.env.get('R2_BUCKET_NAME') || 'studio-media'
+  const r2 = new AwsClient({ accessKeyId, secretAccessKey, service: 's3', region: 'auto' })
+  const endpoint = `https://${accountId}.r2.cloudflarestorage.com/${bucket}`
+  return { r2, endpoint }
+}
+
+async function deleteR2Keys(r2: AwsClient, endpoint: string, keys: string[]) {
+  if (keys.length === 0) return
+  // S3 Multi-Object Delete API
+  const objects = keys.map(k => `<Object><Key>${k}</Key></Object>`).join('')
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><Delete>${objects}</Delete>`
+  const res = await r2.fetch(`${endpoint}?delete`, {
+    method: 'POST',
+    body: xml,
+    headers: { 'Content-Type': 'application/xml' },
+  })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`R2 multi-delete failed (${res.status}): ${text}`)
+  }
+}
+
+async function listR2Keys(r2: AwsClient, endpoint: string, prefix: string): Promise<string[]> {
+  const keys: string[] = []
+  let continuationToken = ''
+  while (true) {
+    const url = `${endpoint}?list-type=2&prefix=${encodeURIComponent(prefix)}${continuationToken ? `&continuation-token=${encodeURIComponent(continuationToken)}` : ''}`
+    const res = await r2.fetch(url)
+    if (!res.ok) throw new Error(`R2 list failed (${res.status})`)
+    const xml = await res.text()
+    // Extract <Key> values from XML
+    const matches = xml.matchAll(/<Key>([^<]+)<\/Key>/g)
+    for (const m of matches) keys.push(m[1])
+    // Check for truncation
+    const truncated = /<IsTruncated>true<\/IsTruncated>/.test(xml)
+    if (!truncated) break
+    const tokenMatch = xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/)
+    if (!tokenMatch) break
+    continuationToken = tokenMatch[1]
+  }
+  return keys
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Use service role key — bypasses RLS, has full storage access
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const { r2, endpoint } = getR2Client()
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      { auth: { persistSession: false } },
+    )
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false },
-    });
+    let body: any = {}
+    try { body = await req.json() } catch { /* no body = purge all */ }
 
-    const BUCKET = 'studio-media';
-
-    // ── Single-path delete mode (for individual item delete) ──
-    let body: any = {};
-    try { body = await req.json(); } catch { /* no body = purge all */ }
-
+    // ── Single / multi path delete ──
     if (body.paths && Array.isArray(body.paths) && body.paths.length > 0) {
-      const { error } = await supabase.storage.from(BUCKET).remove(body.paths);
+      await deleteR2Keys(r2, endpoint, body.paths)
       return new Response(
-        JSON.stringify({ success: !error, error: error?.message }),
+        JSON.stringify({ success: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
+      )
     }
 
     // ── Purge ALL mode ──
-    const FOLDERS = ['videos', 'images', 'audio'];
-    const deleted: string[] = [];
-    const errors: string[] = [];
+    const FOLDERS = ['videos', 'images', 'audio']
+    const errors: string[] = []
+    let totalDeleted = 0
 
-    // List and delete every file in each known folder
     for (const folder of FOLDERS) {
-      let offset = 0;
-      const pageSize = 100;
-
-      while (true) {
-        const { data: files, error: listErr } = await supabase.storage
-          .from(BUCKET)
-          .list(folder, { limit: pageSize, offset });
-
-        if (listErr) {
-          errors.push(`list ${folder}: ${listErr.message}`);
-          break;
+      try {
+        const keys = await listR2Keys(r2, endpoint, `${folder}/`)
+        if (keys.length > 0) {
+          await deleteR2Keys(r2, endpoint, keys)
+          totalDeleted += keys.length
         }
-        if (!files || files.length === 0) break;
-
-        const paths = files.map((f: any) => `${folder}/${f.name}`);
-        const { error: removeErr } = await supabase.storage
-          .from(BUCKET)
-          .remove(paths);
-
-        if (removeErr) {
-          errors.push(`remove ${folder}: ${removeErr.message}`);
-        } else {
-          deleted.push(...paths);
-        }
-
-        if (files.length < pageSize) break;
-        offset += pageSize;
+      } catch (e: any) {
+        errors.push(`${folder}: ${e.message}`)
       }
     }
 
-    // Also delete all DB records
+    // Delete all DB records
     const { error: dbErr } = await supabase
       .from('studio_gallery')
       .delete()
-      .gt('id', 0);   // id is bigint — gt(0) matches all positive IDs
+      .gt('id', 0)
 
-    if (dbErr) {
-      errors.push(`db: ${dbErr.message}`);
-    }
+    if (dbErr) errors.push(`db: ${dbErr.message}`)
 
     return new Response(
       JSON.stringify({
         success: errors.length === 0,
-        deletedFiles: deleted.length,
+        deletedFiles: totalDeleted,
         errors: errors.length > 0 ? errors : undefined,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    );
+    )
   } catch (err: any) {
     return new Response(
       JSON.stringify({ success: false, error: err.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    );
+    )
   }
-});
+})

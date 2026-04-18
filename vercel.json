@@ -6,6 +6,12 @@
         { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
         { "key": "Cross-Origin-Embedder-Policy", "value": "credentialless" }
       ]
+    },
+    {
+      "source": "/assets/(.*)\\.js",
+      "headers": [
+        { "key": "Cross-Origin-Resource-Policy", "value": "cross-origin" }
+      ]
     }
   ],
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
